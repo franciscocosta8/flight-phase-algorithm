@@ -1,4 +1,4 @@
-%% Fuzzy Membership Functions According to Your Definitions
+%% Fuzzy Membership Functions according to my definitions
 %   H_gnd(η) = Z(η,0,200)
 %   H_lo(η)  = G(η,10000,10000)
 %   H_hi(η)  = G(η,35000,20000)

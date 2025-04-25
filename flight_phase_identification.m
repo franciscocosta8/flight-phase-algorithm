@@ -86,3 +86,4 @@ for f = 1:N
 end
 
 % allStates{f}(i) is the fuzzy-identified phase of sample i in flight f.
+

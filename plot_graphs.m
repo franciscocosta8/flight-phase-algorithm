@@ -1,15 +1,11 @@
-
-close all
-
-% === pick 1 random flight ===
-rng('default');              % for reproducibility
 N = numel(cleanFlights);
+
 % === define colormap and phase names ===
-phaseallNames= {'Ground','Climb','Cruise','Descent','Level flight','Go Around',''};
+phaseallNames= {'Ground','Climb','Cruise','Descent','Level flight','Go-Around',''};
 phase2color = containers.Map(phaseallNames, mat2cell(lines(numel(phaseallNames)),ones(1,numel(phaseallNames)), 3));
 
-for k=46:50
-    % === extract & filter data ===
+for k=1:10
+    % === etract & filter data ===
     T      = cleanFlights(k).flightData;
     t      = T.time;
     alt    = T.h_QNH_Metar;
@@ -21,7 +17,8 @@ for k=46:50
     states = allStates{k}(valid);
     phaseNames = unique(states, 'stable');
     phaseNames = strtrim(phaseNames);
-    cmap  = cell2mat( values(phase2color, cellstr(phaseNames)) );
+    cmap  = cell2mat(values(phase2color, cellstr(phaseNames)));
+
     % === plot altitude vs. time, colored by phase ===
     figure('Position',[100 100 800 400])
     gscatter(t, alt, states, cmap, '.', 10)

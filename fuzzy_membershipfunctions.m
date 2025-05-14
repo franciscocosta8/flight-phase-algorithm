@@ -21,7 +21,7 @@ v   = linspace(0,700,701);        % speed in knots
 p   = linspace(0,6,601);          % phase axis (0 to 6)
 
 % 2) Compute each membership function
-H_gnd = zmf(eta, [0 200]);               % Z(η,0,200)
+H_gnd = zmf(eta, [30 150]);               % Z(η,0,200)
 H_lo  = gaussmf(eta, [10000 10000]);     % G(η,10000,10000)
 H_hi  = gaussmf(eta, [20000 35000]);     % G(η,35000,20000)
 

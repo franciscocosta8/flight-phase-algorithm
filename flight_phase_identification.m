@@ -10,10 +10,9 @@ fprintf("Filtered to %d valid flights.\n", sum(validIdx));
 %% Stage 2 – Fuzzy Phase Identification per ADS-B Sample
 % Implements fuzzy rules (6a)–(6e) and defuzzifies via (7f)–(8).
 
+
 N = numel(cleanFlights);
 allStates = cell(1, N);
-phaseNames = {'Ground','Climb','Cruise','Descent','Level flight','Go-Around'};
-
 % Define lineear spaces
 eta = linspace(0,40000,401);      % altitude in feet
 tau = linspace(-4000,4000,801);   % rate of climb in ft/min
@@ -48,8 +47,6 @@ for f = 1:N
     alt = T.h_QNH_Metar;     % altitude (ft) %apply 1600 for test purposes only
     roc = T.h_dot_baro;      % RoC (ft/min)
     gs  = T.gs;              % ground speed (kt)
-    n   = height(T);
-    states = strings(n,1);
 
     validSamples = isfinite(alt) & isfinite(roc) & isfinite(gs);
     alt = alt(validSamples);
@@ -57,6 +54,7 @@ for f = 1:N
     gs  = gs(validSamples);
     n   = numel(alt);
 
+    phaseStates = repmat( FlightPhase.Ground, n, 1 );
     for i = 1:n        
         % 1) Compute input memberships
         mu_gnd  = H_gnd(alt(i));
@@ -70,25 +68,26 @@ for f = 1:N
         mu_vhi  = V_hi(gs(i));
 
         % 2) Apply rules (6a)–(6e)
+
         Sgnd = min([min([mu_gnd]), PgndVal ]); %', mu_vlo, mu_roc0]' will not work since were turning down mmuch data
         Sclb = min([min([mu_lo, mu_vmid, mu_rocp]), PclbVal ]);
         Scru = min([min([mu_hi, mu_vhi,  mu_roc0]), PcruVal ]);
         Sdes = min([min([mu_lo, mu_vmid, mu_rocm]), PdesVal ]);
         Slvl = min([min([mu_lo, mu_vmid, mu_roc0]), PlvlVal ]);
-        Sgoa = min([min([mu_lo, mu_rocp, mu_vlo]), PgoaVal ]);
+        %Sgoa = min([min([mu_lo, mu_rocp, mu_vlo]), PgoaVal ]);
 
         %r1 = min([ mu_lo, mu_rocp, mu_vmid ]);   % medium speed
         %r2 = min([ mu_lo, mu_rocp, mu_vhi  ]);   % high speed
         %Sgoa = min( max(r1, r2), PgoaVal ); % go around
 
         % 3) Defuzzify (7f) and round (8)
-        scores = [Sgnd, Sclb, Scru, Sdes, Slvl,Sgoa];
+        scores = [Sgnd, Sclb, Scru, Sdes, Slvl];
         [~, idx] = max(scores);
-        phaseIdx = round(idx);
-        states(i) = phaseNames{phaseIdx};
+        phaseStates(i) = FlightPhase(idx);
     end
-
-    allStates{f} = states;
+    allStates{f}=phaseStates;
+    labels= FlightPhase.list();     
+    allStates_names{f} = labels(phaseStates);
 end
 
 % allStates{f}(i) is the fuzzy-identified phase of sample i in flight f.

@@ -3,12 +3,12 @@ phaseLabels = FlightPhase.list();           % {'Ground';'Climb';...}
 Cmap         = lines(numel(phaseLabels));   % 6×3
 phase2color = containers.Map(FlightPhase.list(), mat2cell(lines(numel(FlightPhase.list())),ones(1,numel(FlightPhase.list())), 3));
 
-for k = 379
+for k = 375:385
     % --- load & filter the k‐th flight ---
     T     = cleanFlights(k).flightData;
     t0    = T.time;
     alt0  = T.h_QNH_Metar;
-    roc0  = ((T.h_dot_geom+T.h_dot_baro)/2);
+    roc0  = T.h_dot_baro;
     gs0   = T.gs;
     
     valid = isfinite(alt0) & isfinite(roc0) & isfinite(gs0);

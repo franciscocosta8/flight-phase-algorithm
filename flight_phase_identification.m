@@ -3,14 +3,14 @@
 load('results.mat');
 
 %% Stage 1 – Filter out invalid flights
-validIdx = arrayfun(@(f) isValidFlight(f.callsign, f.airline), results);
+validIdx = arrayfun(@(f) isValidFlight(f.callsign, f.airline, f.departure), results);
 cleanFlights = results(validIdx);
 fprintf("Filtered to %d valid flights.\n", sum(validIdx));
 
 %% Stage 2 – Fuzzy Phase Identification per ADS-B Sample
 % Implements fuzzy rules (6a)–(6e) and defuzzifies via (7f)–(8).
 
-
+cfg=config();
 N = numel(cleanFlights);
 allStates = cell(1, N);
 % Define lineear spaces
@@ -48,19 +48,48 @@ Sdest=[];
 Slvlt=[];
 
 % Loop over flights
-for f=376:379
+for f=1:N
     T = cleanFlights(f).flightData;
     time = T.time;
     alt = T.h_QNH_Metar;     % altitude (ft) %apply 1600 for test purposes only
-    roc = ((T.h_dot_geom+T.h_dot_baro)/2);      % RoC (ft/min)
+    roc = T.h_dot_baro;      % RoC (ft/min)
     gs  = T.gs;              % ground speed (kt)
 
     validSamples = isfinite(alt) & isfinite(roc) & isfinite(gs);
-    alt = alt(validSamples);
+    time=time(validSamples);
     roc = roc(validSamples);
+    alt = alt(validSamples);
     gs  = gs(validSamples);
-    n   = numel(alt);
+    
+    
+    % Derivative Filter on RoC (vertical acceleration)
+    % 1) Compute time differences in seconds
+    dt_sec = seconds(diff(time));             
+    % 2) Compute acceleration of RoC: (ft/min) per second
+    acc = [0; diff(roc) ./ dt_sec];            
 
+    % 3) Thresholding for physically impossible accelerations
+    thr_acc = cfg.thr_acc;  % (ft/min)/s — tune to your aircraft
+    isErr = abs(acc) > thr_acc;
+
+    % 4) Grow mask across small gaps (kernel width W samples)
+    W   = cfg.W;       % e.g. bridge up to 5-sample clusters
+    idx = find(isErr);
+    for k = 1:numel(idx)-1
+        if idx(k+1) - idx(k) <= W
+            isErr(idx(k):idx(k+1)) = true;
+        end
+    end
+
+    % 5) Keep only good samples
+    keep = ~isErr;
+    time = time(keep);
+    roc  = roc(keep);
+    alt  = alt(keep);
+    gs   = gs(keep);
+    
+
+    n   = numel(alt);
     phaseStates = repmat( FlightPhase.Ground, n, 1 );
     for i = 1:n        
         % 1) Compute input memberships

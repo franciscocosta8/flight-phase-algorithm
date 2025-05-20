@@ -1,10 +1,6 @@
-function tf = isValidFlight(callsign, airline)
+function tf = isValidFlight(callsign, airline, departures)
     % Returns TRUE if callsign and airline are valid identifiers.
     % Filters out empty, whitespace-only, literal '""', or placeholder strings.
-
-    % Convert to string for uniform handling
-    %cs = string(callsign);
-    %al = string(airline);
 
     % Trim whitespace
     csTrim = strtrim(string(callsign));
@@ -12,10 +8,10 @@ function tf = isValidFlight(callsign, airline)
 
     % Conditions for invalid ID
     condEmpty   = csTrim==""   || alTrim=="";
-    condPlace   = startsWith(csTrim, "@@@", "IgnoreCase", true) || ...
-                  startsWith(alTrim, "@@@", "IgnoreCase", true);
-
-    if condEmpty || condPlace
+    condPlace   = startsWith(csTrim, "@@@", "IgnoreCase", true) || startsWith(alTrim, "@@@", "IgnoreCase", true);
+    condNoDepartures=isempty(departures);
+    
+    if condEmpty || condPlace || condNoDepartures
         tf = false;
     else
         tf = true;

@@ -3,17 +3,18 @@ phaseLabels = FlightPhase.list();           % {'Ground';'Climb';...}
 Cmap         = lines(numel(phaseLabels));   % 6×3
 phase2color = containers.Map(FlightPhase.list(), mat2cell(lines(numel(FlightPhase.list())),ones(1,numel(FlightPhase.list())), 3));
 
-for k = 360:380
+for k = 379
     % --- load & filter the k‐th flight ---
     T     = cleanFlights(k).flightData;
     t0    = T.time;
     alt0  = T.h_QNH_Metar;
-    roc0  = T.h_dot_baro;
+    roc0  = ((T.h_dot_geom+T.h_dot_baro)/2);
     gs0   = T.gs;
     
     valid = isfinite(alt0) & isfinite(roc0) & isfinite(gs0);
     t     = t0(valid);
     alt   = alt0(valid);
+    roc=roc0(valid);
     
     % --- grab your phase names and force a column of chars ---
     rawStates = allStates_names{k};    % might be cell or string
@@ -28,15 +29,28 @@ for k = 360:380
     cmap = cell2mat( values( phase2color, grpNames ) );
     % (phase2color was your containers.Map from FlightPhase.list() → lines(6))
 
-    % --- plot with gscatter ---
-    figure('Position',[100 100 800 400])
+       figure('Position',[100 100 1000 500])
+    
+    % Altitude on left y-axis
+    yyaxis left
     gscatter(t, alt, grp, cmap, '.', 10)
+    ylabel('Altitude (ft)')
+    ylim([min(alt)-500, max(alt)+500])
+
+    % Rate of climb on right y-axis
+    yyaxis right
+    hold on
+    for i = 1:max(grp)
+        idx = grp == i;
+        plot(t(idx), roc(idx), '.', 'Color', cmap(i,:), 'Marker', 'o', 'HandleVisibility','off');
+    end
+    ylabel('Rate of Climb (ft/min)')
+
+    % Shared settings
     datetick('x','HH:MM','keepticks')
     xlabel('Time')
-    ylabel('Altitude (ft)')
     title(sprintf("Flight %s (idx %d)", cleanFlights(k).callsign, k))
+    legend(grpNames, 'Location', 'eastoutside')
     grid on
 
-    % --- legend using the grpNames in exactly the same order as cmap rows ---
-    legend(grpNames,'Location','eastoutside')
 end

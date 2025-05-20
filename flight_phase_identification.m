@@ -40,12 +40,19 @@ V_lo  = @(v) gaussmf(v, [50,   0]);          % G(v,0,50)
 V_mid = @(v) gaussmf(v, [100, 300]);         % G(v,300,100)
 V_hi  = @(v) gaussmf(v, [100, 600]);         % G(v,600,100)
 
+%simple test
+Sgndt=[];
+Sclbt=[];
+Scrut=[];
+Sdest=[];
+Slvlt=[];
+
 % Loop over flights
-for f = 1:N
+for f=376:379
     T = cleanFlights(f).flightData;
     time = T.time;
     alt = T.h_QNH_Metar;     % altitude (ft) %apply 1600 for test purposes only
-    roc = T.h_dot_baro;      % RoC (ft/min)
+    roc = ((T.h_dot_geom+T.h_dot_baro)/2);      % RoC (ft/min)
     gs  = T.gs;              % ground speed (kt)
 
     validSamples = isfinite(alt) & isfinite(roc) & isfinite(gs);
@@ -75,6 +82,12 @@ for f = 1:N
         Sdes = min([min([mu_lo, mu_vmid, mu_rocm]), PdesVal ]);
         Slvl = min([min([mu_lo, mu_vmid, mu_roc0]), PlvlVal ]);
         %Sgoa = min([min([mu_lo, mu_rocp, mu_vlo]), PgoaVal ]);
+
+        Sgndt(end+1)=Sgnd;
+        Sclbt(end+1)=Sclb;
+        Scrut(end+1)=Scru;
+        Sdest(end+1)=Sdes;
+        Slvlt(end+1)=Slvl;
 
         %r1 = min([ mu_lo, mu_rocp, mu_vmid ]);   % medium speed
         %r2 = min([ mu_lo, mu_rocp, mu_vhi  ]);   % high speed

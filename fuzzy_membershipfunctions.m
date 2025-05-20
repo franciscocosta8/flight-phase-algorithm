@@ -25,7 +25,7 @@ H_gnd = zmf(eta, [30 150]);               % Z(η,0,200)
 H_lo  = gaussmf(eta, [10000 10000]);     % G(η,10000,10000)
 H_hi  = gaussmf(eta, [20000 35000]);     % G(η,35000,20000)
 
-RoC0 = gaussmf(tau,[100 0]);             % G(τ,0,100)
+RoC0 = gaussmf(tau,[150 0]);             % G(τ,0,100)
 RoCp = smf(tau, [10 1000]);              % S(τ,10,1000)
 RoCm = zmf(tau,[-1000 -10]);             % Z(τ,–1000,–10)
 

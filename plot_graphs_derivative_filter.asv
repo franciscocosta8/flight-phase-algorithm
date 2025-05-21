@@ -76,9 +76,9 @@ for k=1:10
     hold(ax1, 'on');
     
     % 1) linha de altitude estimada
-    %alt_est = interp1(t, alt, t0, 'pchip');
-    %plot(ax1, t0, alt_est, '-', 'LineWidth',1.5, ...
-    %     'Color',[0 0 0], 'DisplayName','Estimated altitude');
+    alt_est = interp1(t, alt, t0, 'pchip');
+    plot(ax1, t0, alt_est, '-', 'LineWidth',1.5, ...
+         'Color',[0 0 0], 'DisplayName','Estimated altitude');
     
     % 2) pontos removidos
     scatter(ax1, t_removed, alt_removed, 36, 'r', 'x', ...

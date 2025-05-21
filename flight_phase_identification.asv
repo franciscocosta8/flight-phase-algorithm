@@ -3,14 +3,14 @@
 load('results.mat');
 
 %% Stage 1 – Filter out invalid flights
-validIdx = arrayfun(@(f) isValidFlight(f.callsign, f.airline), results);
+validIdx = arrayfun(@(f) isValidFlight(f.callsign, f.airline, f.departure), results);
 cleanFlights = results(validIdx);
 fprintf("Filtered to %d valid flights.\n", sum(validIdx));
 
 %% Stage 2 – Fuzzy Phase Identification per ADS-B Sample
 % Implements fuzzy rules (6a)–(6e) and defuzzifies via (7f)–(8).
 
-run('config.m');
+cfg=config();
 N = numel(cleanFlights);
 allStates = cell(1, N);
 % Define lineear spaces
@@ -32,7 +32,7 @@ H_gnd = @(eta) zmf(eta, [30,   150]);         % Z(η,0,200)
 H_lo  = @(eta) gaussmf(eta, [10000,10000]);   % G(η,10000,10000)
 H_hi  = @(eta) gaussmf(eta, [20000,35000]);   % G(η,35000,20000)
 
-RoC0 = @(tau) gaussmf(tau, [100,   0]);      % G(τ,0,100)
+RoC0 = @(tau) gaussmf(tau, [150,   0]);      % G(τ,0,100)
 RoCp = @(tau) smf( tau, [10, 1000]);         % S(τ,10,1000)
 RoCm = @(tau) zmf( tau, [-1000, -10]);       % Z(τ,-1000,-10)
 
@@ -46,10 +46,10 @@ Sclbt=[];
 Scrut=[];
 Sdest=[];
 Slvlt=[];
-
+mu_roc0t=[];
+mu_rocpt=[];
 % Loop over flights
-for f=1:N
-    f
+for f=340
     T = cleanFlights(f).flightData;
     time = T.time;
     alt = T.h_QNH_Metar;     % altitude (ft) %apply 1600 for test purposes only
@@ -57,23 +57,20 @@ for f=1:N
     gs  = T.gs;              % ground speed (kt)
 
     validSamples = isfinite(alt) & isfinite(roc) & isfinite(gs);
-    alt = alt(validSamples);
-    roc = roc(validSamples);
-    gs  = gs(validSamples);
     time=time(validSamples);
+    roc = roc(validSamples);
+    alt = alt(validSamples);
+    gs  = gs(validSamples);
+    
     
     % Derivative Filter on RoC (vertical acceleration)
-    % 1) Compute time differences in seconds
     dt_sec = seconds(diff(time));             
-    % 2) Compute acceleration of RoC: (ft/min) per second
-    acc = [0; diff(roc) ./ dt_sec];            
+    acc = [0; diff(roc) ./ dt_sec];         %compute accelaration (ft/min)/s  
+    
+    thr_acc = cfg.thr_acc;  % Thresholding for physically impossible accelerations
+    W   = cfg.W;       % e.g. bridge up to 5-sample clusters
 
-    % 3) Thresholding for physically impossible accelerations
-    thr_acc = ;  % (ft/min)/s — tune to your aircraft
     isErr = abs(acc) > thr_acc;
-
-    % 4) Grow mask across small gaps (kernel width W samples)
-    W   = 5;       % e.g. bridge up to 5-sample clusters
     idx = find(isErr);
     for k = 1:numel(idx)-1
         if idx(k+1) - idx(k) <= W
@@ -88,7 +85,7 @@ for f=1:N
     alt  = alt(keep);
     gs   = gs(keep);
     
-
+    
     n   = numel(alt);
     phaseStates = repmat( FlightPhase.Ground, n, 1 );
     for i = 1:n        
@@ -110,17 +107,6 @@ for f=1:N
         Scru = min([min([mu_hi, mu_vhi,  mu_roc0]), PcruVal ]);
         Sdes = min([min([mu_lo, mu_vmid, mu_rocm]), PdesVal ]);
         Slvl = min([min([mu_lo, mu_vmid, mu_roc0]), PlvlVal ]);
-        %Sgoa = min([min([mu_lo, mu_rocp, mu_vlo]), PgoaVal ]);
-
-        Sgndt(end+1)=Sgnd;
-        Sclbt(end+1)=Sclb;
-        Scrut(end+1)=Scru;
-        Sdest(end+1)=Sdes;
-        Slvlt(end+1)=Slvl;
-
-        %r1 = min([ mu_lo, mu_rocp, mu_vmid ]);   % medium speed
-        %r2 = min([ mu_lo, mu_rocp, mu_vhi  ]);   % high speed
-        %Sgoa = min( max(r1, r2), PgoaVal ); % go around
 
         % 3) Defuzzify (7f) and round (8)
         scores = [Sgnd, Sclb, Scru, Sdes, Slvl];

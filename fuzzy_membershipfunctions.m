@@ -13,19 +13,19 @@
 %   P_cru(p)= G(p,3,0.2)
 %   P_des(p)= G(p,4,0.2)
 %   P_lvl(p)= G(p,5,0.2)
-
+cfg=config();
 % 1) Define the continuous axes
-eta = linspace(0,40000,401);      % altitude in feet
-tau = linspace(-4000,4000,801);   % rate of climb in ft/min
-v   = linspace(0,700,701);        % speed in knots
-p   = linspace(0,6,601);          % phase axis (0 to 6)
+eta = cfg.eta;      % altitude in feet
+tau = cfg.tau;   % rate of climb in ft/min
+v   = cfg.v;        % speed in knots
+p   = cfg.p;          % phase axis (0 to 6)
 
 % 2) Compute each membership function
 H_gnd = zmf(eta, [30 150]);               % Z(η,0,200)
 H_lo  = gaussmf(eta, [10000 10000]);     % G(η,10000,10000)
 H_hi  = gaussmf(eta, [20000 35000]);     % G(η,35000,20000)
 
-RoC0 = gaussmf(tau,[150 0]);             % G(τ,0,100)
+RoC0 = gaussmf(tau,[165 0]);             % G(τ,0,100)
 RoCp = smf(tau, [10 1000]);              % S(τ,10,1000)
 RoCm = zmf(tau,[-1000 -10]);             % Z(τ,–1000,–10)
 

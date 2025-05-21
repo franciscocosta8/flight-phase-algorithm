@@ -32,20 +32,13 @@ H_gnd = @(eta) zmf(eta, [30,   150]);         % Z(η,0,200)
 H_lo  = @(eta) gaussmf(eta, [10000,10000]);   % G(η,10000,10000)
 H_hi  = @(eta) gaussmf(eta, [20000,35000]);   % G(η,35000,20000)
 
-RoC0 = @(tau) gaussmf(tau, [100,   0]);      % G(τ,0,100)
+RoC0 = @(tau) gaussmf(tau, [165,   0]);      % G(τ,0,100)
 RoCp = @(tau) smf( tau, [10, 1000]);         % S(τ,10,1000)
 RoCm = @(tau) zmf( tau, [-1000, -10]);       % Z(τ,-1000,-10)
 
 V_lo  = @(v) gaussmf(v, [50,   0]);          % G(v,0,50)
 V_mid = @(v) gaussmf(v, [100, 300]);         % G(v,300,100)
 V_hi  = @(v) gaussmf(v, [100, 600]);         % G(v,600,100)
-
-%simple test
-Sgndt=[];
-Sclbt=[];
-Scrut=[];
-Sdest=[];
-Slvlt=[];
 
 % Loop over flights
 for f=1:N
@@ -63,17 +56,13 @@ for f=1:N
     
     
     % Derivative Filter on RoC (vertical acceleration)
-    % 1) Compute time differences in seconds
     dt_sec = seconds(diff(time));             
-    % 2) Compute acceleration of RoC: (ft/min) per second
-    acc = [0; diff(roc) ./ dt_sec];            
-
-    % 3) Thresholding for physically impossible accelerations
-    thr_acc = cfg.thr_acc;  % (ft/min)/s — tune to your aircraft
-    isErr = abs(acc) > thr_acc;
-
-    % 4) Grow mask across small gaps (kernel width W samples)
+    acc = [0; diff(roc) ./ dt_sec];         %compute accelaration (ft/min)/s  
+    
+    thr_acc = cfg.thr_acc;  % Thresholding for physically impossible accelerations
     W   = cfg.W;       % e.g. bridge up to 5-sample clusters
+
+    isErr = abs(acc) > thr_acc;
     idx = find(isErr);
     for k = 1:numel(idx)-1
         if idx(k+1) - idx(k) <= W
@@ -88,7 +77,7 @@ for f=1:N
     alt  = alt(keep);
     gs   = gs(keep);
     
-
+    
     n   = numel(alt);
     phaseStates = repmat( FlightPhase.Ground, n, 1 );
     for i = 1:n        
@@ -110,17 +99,6 @@ for f=1:N
         Scru = min([min([mu_hi, mu_vhi,  mu_roc0]), PcruVal ]);
         Sdes = min([min([mu_lo, mu_vmid, mu_rocm]), PdesVal ]);
         Slvl = min([min([mu_lo, mu_vmid, mu_roc0]), PlvlVal ]);
-        %Sgoa = min([min([mu_lo, mu_rocp, mu_vlo]), PgoaVal ]);
-
-        Sgndt(end+1)=Sgnd;
-        Sclbt(end+1)=Sclb;
-        Scrut(end+1)=Scru;
-        Sdest(end+1)=Sdes;
-        Slvlt(end+1)=Slvl;
-
-        %r1 = min([ mu_lo, mu_rocp, mu_vmid ]);   % medium speed
-        %r2 = min([ mu_lo, mu_rocp, mu_vhi  ]);   % high speed
-        %Sgoa = min( max(r1, r2), PgoaVal ); % go around
 
         % 3) Defuzzify (7f) and round (8)
         scores = [Sgnd, Sclb, Scru, Sdes, Slvl];

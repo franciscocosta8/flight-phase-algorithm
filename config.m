@@ -14,4 +14,44 @@ function cfg = config()
   );
 
   % 3) Fuzzy membership functions
+    % Continuous axis
+    cfg.eta = linspace(0,40000,401);      % altitude in feet
+    cfg.tau = linspace(-4000,4000,801);   % rate of climb in ft/min
+    cfg.v   = linspace(0,700,701);        % speed in knots
+    cfg.p   = linspace(0,6,601);          % phase axis (0 to 6)
+
+    % Fuzzy Membership Functions according to my definitions
+    %   H_gnd(η) = Z(η,0,200)
+    %   H_lo(η)  = G(η,10000,10000)
+    %   H_hi(η)  = G(η,35000,20000)
+    %   RoC0(τ)  = G(τ,0,100)
+    %   RoC+(τ)  = S(τ,10,1000)
+    %   RoC–(τ)  = Z(τ,–1000,–10)
+    %   V_lo(v)  = G(v,0,50)
+    %   V_mid(v) = G(v,300,100)
+    %   V_hi(v)  = G(v,600,100)
+    %   P_gnd(p)= G(p,1,0.2)
+    %   P_clb(p)= G(p,2,0.2)
+    %   P_cru(p)= G(p,3,0.2)
+    %   P_des(p)= G(p,4,0.2)
+    %   P_lvl(p)= G(p,5,0.2)
+
+    % Fuzzy Membership Functions according to my definitions
+    %   H_gnd(η) = Z(η,0,200)
+    %   H_lo(η)  = G(η,10000,10000)
+    %   H_hi(η)  = G(η,35000,20000)
+    %   RoC0(τ)  = G(τ,0,100)
+    %   RoC+(τ)  = S(τ,10,1000)
+    %   RoC–(τ)  = Z(τ,–1000,–10)
+    %   V_lo(v)  = G(v,0,50)
+    %   V_mid(v) = G(v,300,100)
+    %   V_hi(v)  = G(v,600,100)
+    %   P_gnd(p)= G(p,1,0.2)
+    %   P_clb(p)= G(p,2,0.2)
+    %   P_cru(p)= G(p,3,0.2)
+    %   P_des(p)= G(p,4,0.2)
+    %   P_lvl(p)= G(p,5,0.2)
+
+
+
 end

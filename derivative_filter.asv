@@ -1,6 +1,6 @@
 function [keep, removedIdx] = derivative_filter(time, roc, thr_acc, tolerance, cap)
-%CONSISTENCY_FILTER Filters ADS‑B RoC data using a derivative-based consistency rule.
-%   [keep, removedIdx] = CONSISTENCY_FILTER(time, roc, thr_acc, W,
+%Derivative_FILTER Filters ADS‑B RoC data using a derivative-based consistency rule.
+%   [keep, removedIdx] = Derivative_FILTER(time, roc, thr_acc, W,
 %   tolerance, cap) removes spikes in vertical acceleration and up to 'cap'
 %   subsequent points if their RoC remains within ±tolerance of the
 %   flagged RoC. 

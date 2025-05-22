@@ -6,8 +6,8 @@ function cfg = config()
   cfg.W       = 1;     % 3bridge2 de até 5 amostras
 
   % 1b) Consistency filter parameters
-  cfg.cap=10;
-  cfg.tolerance=5;
+  cfg.cap=5;
+  cfg.tolerance=1;
 
   % 2) Parâmetros de cor / fases
   cfg.phaseLabels = FlightPhase.list();          

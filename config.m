@@ -1,9 +1,13 @@
 function cfg = config()
 %LOADCONFIG Carrega todos os parâmetros usados pelos pipelines
 
-  % 1) Derivative filter parameters
-  cfg.thr_acc = 100;    % limiar de aceleração (ft/min)/s
-  cfg.W       = 3;     % 3bridge2 de até 5 amostras
+  % 1a) Derivative filter parameters
+  cfg.thr_acc = 125;    % limiar de aceleração (ft/min)/s
+  cfg.W       = 1;     % 3bridge2 de até 5 amostras
+
+  % 1b) Consistency filter parameters
+  cfg.cap=10;
+  cfg.tolerance=5;
 
   % 2) Parâmetros de cor / fases
   cfg.phaseLabels = FlightPhase.list();          

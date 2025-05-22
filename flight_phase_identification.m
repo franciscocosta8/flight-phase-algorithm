@@ -10,14 +10,21 @@ fprintf("Filtered to %d valid flights.\n", sum(validIdx));
 %% Stage 2 – Fuzzy Phase Identification per ADS-B Sample
 % Implements fuzzy rules (6a)–(6e) and defuzzifies via (7f)–(8).
 
+voos = input('Insira índice de voo para fazer o gráfico (ex: 1) ou intervalo (ex: 1:3): ');
+
+% Valida entrada
+if isempty(voos)
+    disp('Nenhum voo selecionado. O programa não vai representar nenhum gráfico.');
+end
+
 cfg=config();
 N = numel(cleanFlights);
 allStates = cell(1, N);
 % Define lineear spaces
-eta = linspace(0,40000,401);      % altitude in feet
-tau = linspace(-4000,4000,801);   % rate of climb in ft/min
-v   = linspace(0,700,701);        % speed in knots
-p   = linspace(0,6,601);          % phase axis (0 to 6)
+eta = cfg.eta;      % altitude in feet
+tau = cfg.tau;   % rate of climb in ft/min
+v   = cfg.v;        % speed in knots
+p   = cfg.p;          % phase axis (0 to 6)
 
 % Precompute phase membership values P(P)
 PgndVal = gaussmf(1, [0.2 1]);
@@ -54,29 +61,31 @@ for f=1:N
     alt = alt(validSamples);
     gs  = gs(validSamples);
     
+    [keep, removedIdx] = consistency_filter(time, roc, cfg.thr_acc, cfg.tolerance, cfg.cap);
     
     % Derivative Filter on RoC (vertical acceleration)
-    dt_sec = seconds(diff(time));             
-    acc = [0; diff(roc) ./ dt_sec];         %compute accelaration (ft/min)/s  
+    %dt_sec = seconds(diff(time));             
+    %acc = [0; diff(roc) ./ dt_sec];         %compute accelaration (ft/min)/s  
     
-    thr_acc = cfg.thr_acc;  % Thresholding for physically impossible accelerations
-    W   = cfg.W;       % e.g. bridge up to 5-sample clusters
+    %thr_acc = cfg.thr_acc;  % Thresholding for physically impossible accelerations
+    %W   = cfg.W;       % e.g. bridge up to 5-sample clusters
 
-    isErr = abs(acc) > thr_acc;
-    idx = find(isErr);
-    for k = 1:numel(idx)-1
-        if idx(k+1) - idx(k) <= W
-            isErr(idx(k):idx(k+1)) = true;
-        end
-    end
-
+    %isErr = abs(acc) > thr_acc;
+%    idx = find(isErr);
+ %   for k = 1:numel(idx)-1
+  %      if idx(k+1) - idx(k) <= W
+   %         isErr(idx(k):idx(k+1)) = true;
+    %    end
+%    end
     % 5) Keep only good samples
-    keep = ~isErr;
+    %keep = ~isErr;
+    t_removed=time(~keep);
+    alt_removed=alt(~keep);
+    
     time = time(keep);
     roc  = roc(keep);
     alt  = alt(keep);
     gs   = gs(keep);
-    
     
     n   = numel(alt);
     phaseStates = repmat( FlightPhase.Ground, n, 1 );
@@ -108,7 +117,65 @@ for f=1:N
     allStates{f}=phaseStates;
     labels= FlightPhase.list();     
     allStates_names{f} = labels(phaseStates);
-end
 
+    if ismember(f, voos)
+    
+        rawStates = allStates_names{f};     
+        rawStates = cellstr(rawStates(:));  % força N×1 cell array of char
+        
+        % 5) agrupa e escolhe cores
+        [grp, grpNames] = findgroups(rawStates);
+        cmap = cell2mat(values(phase2color, grpNames));
+        
+    %    fprintf("→ numel(t0) = %d\n",   numel(t0));
+     %   fprintf("→ sum(keep) = %d\n",   sum(keep));
+      %  fprintf("→ numel(t) = %d\n",    numel(t));
+       % fprintf("→ numel(rawStates) = %d\n", numel(rawStates));
+        %fprintf("→ numel(grp) = %d\n\n", numel(grp));
+    
+        N = min([numel(time), numel(rawStates), numel(grp)]);
+        if numel(time) > N
+            t   = time(1:N);
+            alt = alt(1:N);
+            roc = roc(1:N);
+            grp = grp(1:N);
+        end
+    
+    
+        % ... cálculo de t0, alt0, roc0, acc, keep, etc. ...
+    
+        % cria figura e ax1
+        hFig = figure('Position',[100 100 1000 500]);
+        ax1 = axes('Parent', hFig);
+        hold(ax1, 'on');
+        
+        % 1) linha de altitude estimada
+        %alt_est = interp1(t, alt, t0, 'pchip');
+        %plot(ax1, t0, alt_est, '-', 'LineWidth',1.5, ...
+        %     'Color',[0 0 0], 'DisplayName','Estimated altitude');
+        
+        %2) pontos removidos
+        scatter(ax1, t_removed, alt_removed, 36, 'r', 'x', ...
+                'DisplayName','Pontos removidos');
+        
+        % 3) loop de scatter para cada fase
+        for i = 1:numel(grpNames)
+            xi = grp == i;
+            scatter(ax1, time(xi), alt(xi), 100, ...
+                    'Marker', '.', ...
+                    'MarkerEdgeColor', cmap(i,:), ...
+                    'DisplayName', grpNames{i});
+        end
+        
+        % 4) ajustes finais
+        ylabel(ax1, 'Altitude (ft)');
+        ylim(ax1, [min(alt)-500, max(alt)+500]);
+        datetick(ax1, 'x', 'HH:MM', 'keepticks');
+        xlabel(ax1, 'Time');
+        title(ax1, sprintf("Flight %s (idx %d)", cleanFlights(k).callsign, f));
+        legend(ax1, 'Location', 'eastoutside');
+        grid(ax1, 'on');
+    end
+end
 % allStates{f}(i) is the fuzzy-identified phase of sample i in flight f.
 

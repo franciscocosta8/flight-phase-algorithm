@@ -1,9 +1,13 @@
 function cfg = config()
 %LOADCONFIG Carrega todos os parâmetros usados pelos pipelines
 
-  % 1) Derivative filter parameters
-  cfg.thr_acc = 100;    % limiar de aceleração (ft/min)/s
-  cfg.W       = 3;     % 3bridge2 de até 5 amostras
+  % 1a) Derivative filter parameters
+  cfg.thr_acc = 125;    % limiar de aceleração (ft/min)/s
+  cfg.W       = 1;     % 3bridge2 de até 5 amostras
+
+  % 1b) Consistency filter parameters
+  cfg.cap=10;
+  cfg.tolerance=5
 
   % 2) Parâmetros de cor / fases
   cfg.phaseLabels = FlightPhase.list();          
@@ -21,20 +25,36 @@ function cfg = config()
     cfg.p   = linspace(0,6,601);          % phase axis (0 to 6)
 
     % Fuzzy Membership Functions according to my definitions
-%   H_gnd(η) = Z(η,0,200)
-%   H_lo(η)  = G(η,10000,10000)
-%   H_hi(η)  = G(η,35000,20000)
-%   RoC0(τ)  = G(τ,0,100)
-%   RoC+(τ)  = S(τ,10,1000)
-%   RoC–(τ)  = Z(τ,–1000,–10)
-%   V_lo(v)  = G(v,0,50)
-%   V_mid(v) = G(v,300,100)
-%   V_hi(v)  = G(v,600,100)
-%   P_gnd(p)= G(p,1,0.2)
-%   P_clb(p)= G(p,2,0.2)
-%   P_cru(p)= G(p,3,0.2)
-%   P_des(p)= G(p,4,0.2)
-%   P_lvl(p)= G(p,5,0.2)
+    %   H_gnd(η) = Z(η,0,200)
+    %   H_lo(η)  = G(η,10000,10000)
+    %   H_hi(η)  = G(η,35000,20000)
+    %   RoC0(τ)  = G(τ,0,100)
+    %   RoC+(τ)  = S(τ,10,1000)
+    %   RoC–(τ)  = Z(τ,–1000,–10)
+    %   V_lo(v)  = G(v,0,50)
+    %   V_mid(v) = G(v,300,100)
+    %   V_hi(v)  = G(v,600,100)
+    %   P_gnd(p)= G(p,1,0.2)
+    %   P_clb(p)= G(p,2,0.2)
+    %   P_cru(p)= G(p,3,0.2)
+    %   P_des(p)= G(p,4,0.2)
+    %   P_lvl(p)= G(p,5,0.2)
+
+    % Fuzzy Membership Functions according to my definitions
+    %   H_gnd(η) = Z(η,0,200)
+    %   H_lo(η)  = G(η,10000,10000)
+    %   H_hi(η)  = G(η,35000,20000)
+    %   RoC0(τ)  = G(τ,0,100)
+    %   RoC+(τ)  = S(τ,10,1000)
+    %   RoC–(τ)  = Z(τ,–1000,–10)
+    %   V_lo(v)  = G(v,0,50)
+    %   V_mid(v) = G(v,300,100)
+    %   V_hi(v)  = G(v,600,100)
+    %   P_gnd(p)= G(p,1,0.2)
+    %   P_clb(p)= G(p,2,0.2)
+    %   P_cru(p)= G(p,3,0.2)
+    %   P_des(p)= G(p,4,0.2)
+    %   P_lvl(p)= G(p,5,0.2)
 
 
 

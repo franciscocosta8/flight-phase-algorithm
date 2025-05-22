@@ -3,7 +3,7 @@ phaseLabels = FlightPhase.list();           % {'Ground';'Climb';...}
 Cmap         = lines(numel(phaseLabels));   % 6×3
 phase2color = containers.Map(FlightPhase.list(), mat2cell(lines(numel(FlightPhase.list())),ones(1,numel(FlightPhase.list())), 3));
 
-for k = 375:385
+for k = 1:3
     % --- load & filter the k‐th flight ---
     T     = cleanFlights(k).flightData;
     t0    = T.time;
@@ -19,7 +19,7 @@ for k = 375:385
     % --- grab your phase names and force a column of chars ---
     rawStates = allStates_names{k};    % might be cell or string
     rawStates = cellstr(rawStates(:));  % now an N×1 cell array of char
-    
+    rawStates = rawStates(valid); 
     % --- build a numeric grouping + retrieve the unique names in order ---
     [grp, grpNames] = findgroups(rawStates);
     % grp is N×1 of integers 1..M, grpNames is M×1 cell of strings

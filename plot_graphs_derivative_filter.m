@@ -7,11 +7,10 @@ W       = cfg.W;     % largura do cbridge" em amostras
 phaseLabels  = FlightPhase.list();
 phase2color  = containers.Map(...
     phaseLabels, ...
-    mat2cell(lines(numel(phaseLabels)), ones(1,numel(phaseLabels)), 3) ...
-);
+    mat2cell(lines(numel(phaseLabels)), ones(1,numel(phaseLabels)), 3));
 
 % --- plot para o voo k ---
-for k=1:10
+for k=1:3
     T   = cleanFlights(k).flightData;
     
     % 1) carrega e limpa NaNs/Infs

@@ -10,7 +10,7 @@ fprintf("Filtered to %d valid flights.\n", sum(validIdx));
 %% Stage 2 – Fuzzy Phase Identification per ADS-B Sample
 % Implements fuzzy rules (6a)–(6e) and defuzzifies via (7f)–(8).
 
-voos = input('Intert flight index (ex: 1) or interval (ex: 1:3): ');
+voos = input('Insert flight index (ex: 1) or interval to be plot (ex: 1:3): ');
 
 % Valida entrada
 if isempty(voos)
@@ -61,15 +61,15 @@ for f=1:N
     alt = alt(validSamples);
     gs  = gs(validSamples);
     
-    [keep, removedIdx] = derivative_filter(time, roc, cfg.thr_acc, cfg.tolerance, cfg.cap);
+    %[keep, removedIdx] = derivative_filter(time, roc, cfg.thr_acc, cfg.tolerance, cfg.cap);
     
-    t_removed=time(~keep);
-    alt_removed=alt(~keep);
+    %t_removed=time(~keep);
+    %alt_removed=alt(~keep);
     
-    time = time(keep);
-    roc  = roc(keep);
-    alt  = alt(keep);
-    gs   = gs(keep);
+    %time = time(keep);
+    %roc  = roc(keep);
+    %alt  = alt(keep);
+    %gs   = gs(keep);
     
     n   = numel(alt);
     phaseStates = repmat( FlightPhase.Ground, n, 1 );
@@ -98,26 +98,49 @@ for f=1:N
         [~, idx] = max(scores);
         phaseStates(i) = FlightPhase(idx);
     end
+    %[phaseStates, goTable] = detectGoAround(time, alt, phaseStates);
     allStates{f}=phaseStates;
     labels= FlightPhase.list();     
+    %allStates_names{f} = labels(phaseStates);
+
+    %Find Go-Arounds?
+    
+    maxGain= 3500;
+    minGain= 500;      % ft
+    altMax    = 5000;   % ft
+    maxTime   = 300;    % s
+
+    isClimb = (phaseStates == FlightPhase.Climb);  
+    
+    % acha inícios e fins dos blocos
+    d      = diff([0; isClimb; 0]);
+    starts = find(d ==  1);   % ponto onde entra climb
+    ends   = find(d == -1)-1; % ponto onde sai climb
+    
+    % para cada bloco, aplica critérios de go-around
+    for k = 1:numel(starts)
+        idx = starts(k):ends(k);
+        t0  = time(idx(1));
+        t1  = time(idx(end));
+        gain = alt(idx(end)) - alt(idx(1));
+        dur  = t1 - t0;
+        if minGain <= gain && gain <= maxGain && max(alt(idx)) <= altMax && dur <= maxTime
+            phaseStates(idx) = FlightPhase.GoAroundClimb;  % substitui 2 por 6
+        end
+    end
+    
+    % atualiza arrays
+    allStates{f}       = phaseStates;
+    labels= FlightPhase.list();
     allStates_names{f} = labels(phaseStates);
 
+    % Plot desired flights
     if ismember(f, voos)
-    
         rawStates = allStates_names{f};     
         rawStates = cellstr(rawStates(:));  
 
         [grp, grpNames] = findgroups(rawStates);
-        cmap = cell2mat(values(phase2color, grpNames));
-        
-        N = min([numel(time), numel(rawStates), numel(grp)]);
-        if numel(time) > N
-            t   = time(1:N);
-            alt = alt(1:N);
-            roc = roc(1:N);
-            grp = grp(1:N);
-        end
-    
+        cmap = cell2mat(values(cfg.phase2color, grpNames));
     
     
         % cria figura e ax1
@@ -131,8 +154,8 @@ for f=1:N
         %     'Color',[0 0 0], 'DisplayName','Estimated altitude');
         
         % pontos removidos
-        scatter(ax1, t_removed, alt_removed, 36, 'r', 'x', ...
-                'DisplayName','Pontos removidos');
+        %scatter(ax1, t_removed, alt_removed, 36, 'r', 'x', ...
+         %       'DisplayName','Pontos removidos');
         
         %  loop de scatter para cada fase
         for i = 1:numel(grpNames)
@@ -148,10 +171,11 @@ for f=1:N
         ylim(ax1, [min(alt)-500, max(alt)+500]);
         datetick(ax1, 'x', 'HH:MM', 'keepticks');
         xlabel(ax1, 'Time');
-        title(ax1, sprintf("Flight %s (idx %d)", cleanFlights(k).callsign, f));
+        title(ax1, sprintf("Flight %s (idx %d)", cleanFlights(f).callsign, f));
         legend(ax1, 'Location', 'eastoutside');
         grid(ax1, 'on');
     end
 end
+
 disp('Program finished.')
 

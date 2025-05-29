@@ -6,12 +6,13 @@ classdef FlightPhase < uint8
     Cruise    (3)
     Descent   (4)
     Level     (5)
+    GoAroundClimb (6)
   end
 
   methods (Static)
     function names = list()
       % returns a cell-array of phase names, if you really need one
-      names = { 'Ground','Climb','Cruise','Descent','Level flight'};
+      names = { 'Ground','Climb','Cruise','Descent','Level flight', 'GoAroundClimb'};
     end
   end
 end

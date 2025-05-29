@@ -4,10 +4,10 @@ function cfg = config()
   % 1a) Derivative filter parameters
   cfg.thr_acc = 125;    % limiar de aceleração (ft/min)/s
   cfg.W       = 1;     % 3bridge2 de até 5 amostras
-
-  % 1b) Consistency filter parameters
   cfg.cap=5;
   cfg.tolerance=1;
+
+  %
 
   % 2) Parâmetros de cor / fases
   cfg.phaseLabels = FlightPhase.list();          
@@ -16,6 +16,14 @@ function cfg = config()
       cfg.phaseLabels, ...
       mat2cell(cmap, ones(1,numel(cfg.phaseLabels)), 3) ...
   );
+   
+  %cfg.phase2color = containers.Map( ...
+   %     {'Ground','Climb','Cruise','Descent','Level','GoAroundClimb'}, [  0 0 0;        % Ground – preto
+    %       1 0.5 0;      % Climb – laranja
+     %      0 1 1;        % Cruise – azul
+      %     0 0 1;        % Descent – vermelho
+       %    0 0.7 0;      % Level – verde
+        %   0.5 0.5 0.5];);     % GoAroundClimb – cinza  
 
   % 3) Fuzzy membership functions
     % Continuous axis

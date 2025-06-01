@@ -8,13 +8,12 @@ cleanFlights = results(validIdx);
 fprintf("Filtered to %d valid flights.\n", sum(validIdx));
 
 %% Stage 2 – Fuzzy Phase Identification per ADS-B Sample
-% Implements fuzzy rules (6a)–(6e) and defuzzifies via (7f)–(8).
 
 voos = input('Insert flight index (ex: 1) or interval to be plot (ex: 1:3): ');
 
 % Valida entrada
 if isempty(voos)
-    disp('No selected flight. Program is not going to show any figure.');
+    disp('No selected flight. Program is not going to depict any figure.');
 end
 
 cfg=config();
@@ -48,7 +47,7 @@ V_mid = @(v) gaussmf(v, [100, 300]);         % G(v,300,100)
 V_hi  = @(v) gaussmf(v, [100, 600]);         % G(v,600,100)
 
 % Loop over flights
-for f=1:N
+parfor f=1:N
     T = cleanFlights(f).flightData;
     time = T.time;
     alt = T.h_QNH_Metar;     % altitude (ft) %apply 1600 for test purposes only
@@ -87,7 +86,7 @@ for f=1:N
 
         % 2) Apply rules (6a)–(6e)
 
-        Sgnd = min([min([mu_gnd]), PgndVal ]); %', mu_vlo, mu_roc0]' will not work since were turning down mmuch data
+        Sgnd = min([min(mu_gnd), PgndVal ]); %', mu_vlo, mu_roc0]' will not work since were turning down mmuch data
         Sclb = min([min([mu_lo, mu_vmid, mu_rocp]), PclbVal ]);
         Scru = min([min([mu_hi, mu_vhi,  mu_roc0]), PcruVal ]);
         Sdes = min([min([mu_lo, mu_vmid, mu_rocm]), PdesVal ]);
@@ -98,40 +97,30 @@ for f=1:N
         [~, idx] = max(scores);
         phaseStates(i) = FlightPhase(idx);
     end
-    %[phaseStates, goTable] = detectGoAround(time, alt, phaseStates);
+
+    % Identify Go Around
+    if any(phaseStates == FlightPhase.Climb)
+        [phaseStates] = detectGoAround(time, alt, phaseStates, FlightPhase.Climb);
+    else
+        allStates{f}=phaseStates;
+        labels= FlightPhase.list();     
+        allStates_names{f} = labels(phaseStates);
+    end
+
+     % 2) remove points classified with climb or descent that are not
+     % changing altitude
+    keepIdx = filterFlatClimbDescent(alt, phaseStates);
+    t_removed=time(~keepIdx);
+    alt_removed=alt(~keepIdx);
+    % Agora refazemos todos os vetores “time, roc, alt, gs, phaseStates”
+    time = time(keepIdx);
+    roc  = roc(keepIdx);
+    alt  = alt(keepIdx);
+    gs   = gs(keepIdx);
+    phaseStates = phaseStates(keepIdx);
+
     allStates{f}=phaseStates;
     labels= FlightPhase.list();     
-    %allStates_names{f} = labels(phaseStates);
-
-    %Find Go-Arounds?
-    
-    maxGain= 3500;
-    minGain= 500;      % ft
-    altMax    = 5000;   % ft
-    maxTime   = 300;    % s
-
-    isClimb = (phaseStates == FlightPhase.Climb);  
-    
-    % acha inícios e fins dos blocos
-    d      = diff([0; isClimb; 0]);
-    starts = find(d ==  1);   % ponto onde entra climb
-    ends   = find(d == -1)-1; % ponto onde sai climb
-    
-    % para cada bloco, aplica critérios de go-around
-    for k = 1:numel(starts)
-        idx = starts(k):ends(k);
-        t0  = time(idx(1));
-        t1  = time(idx(end));
-        gain = alt(idx(end)) - alt(idx(1));
-        dur  = t1 - t0;
-        if minGain <= gain && gain <= maxGain && max(alt(idx)) <= altMax && dur <= maxTime
-            phaseStates(idx) = FlightPhase.GoAroundClimb;  % substitui 2 por 6
-        end
-    end
-    
-    % atualiza arrays
-    allStates{f}       = phaseStates;
-    labels= FlightPhase.list();
     allStates_names{f} = labels(phaseStates);
 
     % Plot desired flights
@@ -153,9 +142,9 @@ for f=1:N
         %plot(ax1, t0, alt_est, '-', 'LineWidth',1.5, ...
         %     'Color',[0 0 0], 'DisplayName','Estimated altitude');
         
-        % pontos removidos
-        %scatter(ax1, t_removed, alt_removed, 36, 'r', 'x', ...
-         %       'DisplayName','Pontos removidos');
+        %pontos removidos
+        scatter(ax1, t_removed, alt_removed, 36, 'r', 'x', ...
+               'DisplayName','Pontos removidos');
         
         %  loop de scatter para cada fase
         for i = 1:numel(grpNames)
@@ -178,4 +167,3 @@ for f=1:N
 end
 
 disp('Program finished.')
-

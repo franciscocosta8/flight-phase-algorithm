@@ -3,34 +3,36 @@ function cfg = config()
 
   % 1a) Derivative filter parameters
   cfg.thr_acc = 125;    % limiar de aceleração (ft/min)/s
-  cfg.W       = 1;     % 3bridge2 de até 5 amostras
+  cfg.W = 1;     % 3bridge2 de até 5 amostras
   cfg.cap=5;
   cfg.tolerance=1;
 
-  %
+  % Define Colours for each Flight phase
+  % cfg.phaseLabels = FlightPhase.list(); 
+  % cfg.phaseColors = { ...
+  %   [0.00 0.00 0.00];   % Ground       → preto
+  %   [0.00 0.45 0.74];   % Climb        → azul-escuro
+  %   [0.47 0.67 0.19];   % Cruise       → verde-oliva
+  %   [0.85 0.33 0.10];   % Descent      → laranja
+  %   [0.49 0.18 0.56];   % Level        → roxo
+  %   [0.93 0.69 0.13];   % GoAroundClimb→ amarelo-ouro
+  % };
+  % cfg.phase2color = containers.Map(cfg.phaseLabels, cfg.phaseColors);
 
-  % 2) Parâmetros de cor / fases
-  cfg.phaseLabels = FlightPhase.list();          
-  cmap = lines(numel(cfg.phaseLabels));          
-  cfg.phase2color = containers.Map( ...
-      cfg.phaseLabels, ...
-      mat2cell(cmap, ones(1,numel(cfg.phaseLabels)), 3) ...
-  );
-   
-  %cfg.phase2color = containers.Map( ...
-   %     {'Ground','Climb','Cruise','Descent','Level','GoAroundClimb'}, [  0 0 0;        % Ground – preto
-    %       1 0.5 0;      % Climb – laranja
-     %      0 1 1;        % Cruise – azul
-      %     0 0 1;        % Descent – vermelho
-       %    0 0.7 0;      % Level – verde
-        %   0.5 0.5 0.5];);     % GoAroundClimb – cinza  
+  cfg.phaseLabels = FlightPhase.list();  
+  N = numel(cfg.phaseLabels);
 
+  cfg.phaseColors = turbo(N);
+
+  %   cfg.phaseColors = parula,hsv, autumn, winter(N);
+  % 3) Monte o containers.Map de label → cor
+  cfg.phase2color = containers.Map(cfg.phaseLabels,mat2cell(cfg.phaseColors,ones(1,N),3));
   % 3) Fuzzy membership functions
-    % Continuous axis
-    cfg.eta = linspace(0,40000,401);      % altitude in feet
-    cfg.tau = linspace(-4000,4000,801);   % rate of climb in ft/min
-    cfg.v   = linspace(0,700,701);        % speed in knots
-    cfg.p   = linspace(0,6,601);          % phase axis (0 to 6)
+  % Continuous axis
+  cfg.eta = linspace(0,40000,401);      % altitude in feet
+  cfg.tau = linspace(-4000,4000,801);   % rate of climb in ft/min
+  cfg.v   = linspace(0,700,701);        % speed in knots
+  cfg.p   = linspace(0,6,601);          % phase axis (0 to 6)
 
     % Fuzzy Membership Functions according to my definitions
     %   H_gnd(η) = Z(η,0,200)

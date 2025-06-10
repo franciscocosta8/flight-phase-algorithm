@@ -3,7 +3,7 @@
 load('results.mat');
 
 %% Stage 1 – Filter out invalid flights
-validIdx = arrayfun(@(f) isValidFlight(f.callsign, f.airline, f.departure), results);
+validIdx = arrayfun(@(f) isValidFlight(f.callsign, f.airline,f.acType ,f.departure), results);
 cleanFlights = results(validIdx);
 fprintf("Filtered to %d valid flights.\n", sum(validIdx));
 
@@ -15,7 +15,7 @@ voos = input('Insert flight index (ex: 1) or interval to be plot (ex: 1:3): ');
 if isempty(voos)
     disp('No selected flight. Program is not going to depict any figure.');
 end
-
+tic;
 cfg=config();
 N = numel(cleanFlights);
 allStates = cell(1, N);
@@ -38,7 +38,7 @@ H_gnd = @(eta) zmf(eta, [30,   150]);         % Z(η,0,200)
 H_lo  = @(eta) gaussmf(eta, [10000,10000]);   % G(η,10000,10000)
 H_hi  = @(eta) gaussmf(eta, [20000,35000]);   % G(η,35000,20000)
 
-RoC0 = @(tau) gaussmf(tau, [165,   0]);      % G(τ,0,100)
+RoC0 = @(tau) gaussmf(tau, [100,   0]);      % G(τ,0,100) 165 used for flightData
 RoCp = @(tau) smf( tau, [10, 1000]);         % S(τ,10,1000)
 RoCm = @(tau) zmf( tau, [-1000, -10]);       % Z(τ,-1000,-10)
 
@@ -46,14 +46,14 @@ V_lo  = @(v) gaussmf(v, [50,   0]);          % G(v,0,50)
 V_mid = @(v) gaussmf(v, [100, 300]);         % G(v,300,100)
 V_hi  = @(v) gaussmf(v, [100, 600]);         % G(v,600,100)
 
+allOverallPhase = strings(1, N);
 % Loop over flights
 parfor f=1:N
-    T = cleanFlights(f).flightData;
+    T = cleanFlights(f).flightData ;  %can be changed to smootherMean or flightData
     time = T.time;
     alt = T.h_QNH_Metar;     % altitude (ft) %apply 1600 for test purposes only
     roc = T.h_dot_baro;      % RoC (ft/min)
     gs  = T.gs;              % ground speed (kt)
-
     validSamples = isfinite(alt) & isfinite(roc) & isfinite(gs);
     time=time(validSamples);
     roc = roc(validSamples);
@@ -61,14 +61,6 @@ parfor f=1:N
     gs  = gs(validSamples);
     
     %[keep, removedIdx] = derivative_filter(time, roc, cfg.thr_acc, cfg.tolerance, cfg.cap);
-    
-    %t_removed=time(~keep);
-    %alt_removed=alt(~keep);
-    
-    %time = time(keep);
-    %roc  = roc(keep);
-    %alt  = alt(keep);
-    %gs   = gs(keep);
     
     n   = numel(alt);
     phaseStates = repmat( FlightPhase.Ground, n, 1 );
@@ -99,7 +91,7 @@ parfor f=1:N
     end
 
     % Identify Go Around
-    if any(phaseStates == FlightPhase.Climb)
+    if any(phaseStates == FlightPhase.Climb) && any(phaseStates == FlightPhase.Descent)
         [phaseStates] = detectGoAround(time, alt, phaseStates, FlightPhase.Climb);
     else
         allStates{f}=phaseStates;
@@ -107,11 +99,14 @@ parfor f=1:N
         allStates_names{f} = labels(phaseStates);
     end
 
+    phaseStates = filterChangeOfPhase(phaseStates, FlightPhase.Climb, FlightPhase.Descent, FlightPhase.Level)
+
      % 2) remove points classified with climb or descent that are not
      % changing altitude
-    keepIdx = filterFlatClimbDescent(alt, phaseStates);
+    [keepIdx,phaseStates] = filterFlatClimbDescent(alt, phaseStates);
     t_removed=time(~keepIdx);
     alt_removed=alt(~keepIdx);
+
     % Agora refazemos todos os vetores “time, roc, alt, gs, phaseStates”
     time = time(keepIdx);
     roc  = roc(keepIdx);
@@ -122,6 +117,48 @@ parfor f=1:N
     allStates{f}=phaseStates;
     labels= FlightPhase.list();     
     allStates_names{f} = labels(phaseStates);
+
+    % Decidir fase global de voo
+
+    hasGoAround = any(phaseStates == FlightPhase.GoAroundClimb);
+
+    if hasGoAround
+        allOverallPhase(f) = string(FlightOverallPhase.LandingWithGoAround);
+    else
+        % (b) Caso não haja Go-Around, contamos quantos pontos de cada fase
+        nClimb  = sum(phaseStates == FlightPhase.Climb);
+        nDes    = sum(phaseStates == FlightPhase.Descent);
+        nLevel  = sum(phaseStates == FlightPhase.Level);
+
+        altFirst = alt(1);
+        altLast  = alt(end);
+
+        % (b1) Critério para Landing:
+        %      • mais pontos de descent do que de climb 
+        %      • e o último ponto de altitude < 2200 ft
+        if (nDes > nClimb) && (altLast < 2200)
+            allOverallPhase(f) = string(FlightOverallPhase.Landing);
+
+        % (b2) Critério para Take-off:
+        %      • mais pontos de climb do que de descent 
+        %      • e o último ponto de altitude > 5000 ft
+        elseif (nClimb > nDes) && (altLast > 5000)
+            allOverallPhase(f) = string(FlightOverallPhase.Takeoff);
+
+        % (b3) Critério para Cruise:
+        %      • mais pontos level flight do que climb e descent
+        %      • e o primeiro e o último ponto de altitude devem estar > 5000 ft
+        elseif (nLevel > nClimb) && (nLevel > nDes) && (altFirst > 5000) && (altLast > 5000)
+            allOverallPhase(f) = string(FlightOverallPhase.Cruise);
+
+        % (b4) Se nenhuma condição anterior for satisfeita, você pode atribuir um
+        %      valor default, por exemplo Cruise ou Ground — adapte conforme
+        %      achar melhor para o seu caso.
+        else
+            allOverallPhase(f) = string(FlightOverallPhase.Cruise); 
+        end
+    end
+
 
     % Plot desired flights
     if ismember(f, voos)
@@ -143,8 +180,8 @@ parfor f=1:N
         %     'Color',[0 0 0], 'DisplayName','Estimated altitude');
         
         %pontos removidos
-        scatter(ax1, t_removed, alt_removed, 36, 'r', 'x', ...
-               'DisplayName','Pontos removidos');
+        %scatter(ax1, t_removed, alt_removed, 36, 'r', 'x', ...
+         %      'DisplayName','Removed points');
         
         %  loop de scatter para cada fase
         for i = 1:numel(grpNames)
@@ -166,4 +203,7 @@ parfor f=1:N
     end
 end
 
+summaryPhases = summarizePhases(allOverallPhase);
+
 disp('Program finished.')
+toc

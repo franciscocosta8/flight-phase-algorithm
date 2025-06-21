@@ -1,18 +1,3 @@
-%% Fuzzy Membership Functions according to my definitions
-%   H_gnd(η) = Z(η,0,200)
-%   H_lo(η)  = G(η,10000,10000)
-%   H_hi(η)  = G(η,35000,20000)
-%   RoC0(τ)  = G(τ,0,100)
-%   RoC+(τ)  = S(τ,10,1000)
-%   RoC–(τ)  = Z(τ,–1000,–10)
-%   V_lo(v)  = G(v,0,50)
-%   V_mid(v) = G(v,300,100)
-%   V_hi(v)  = G(v,600,100)
-%   P_gnd(p)= G(p,1,0.2)
-%   P_clb(p)= G(p,2,0.2)
-%   P_cru(p)= G(p,3,0.2)
-%   P_des(p)= G(p,4,0.2)
-%   P_lvl(p)= G(p,5,0.2)
 cfg=config();
 % 1) Define the continuous axes
 eta = cfg.eta;      % altitude in feet
@@ -21,17 +6,18 @@ v   = cfg.v;        % speed in knots
 p   = cfg.p;          % phase axis (0 to 6)
 
 % 2) Compute each membership function
-H_gnd = zmf(eta, [30 150]);               % Z(η,0,200)
-H_lo  = gaussmf(eta, [10000 10000]);     % G(η,10000,10000)
-H_hi  = gaussmf(eta, [20000 35000]);     % G(η,35000,20000)
+H_gnd = zmf(eta,    cfg.mf.eta.gnd);
+H_lo  = gaussmf(eta, cfg.mf.eta.lo);
+H_hi  = gaussmf(eta, cfg.mf.eta.hi);
 
-RoC0 = gaussmf(tau,[165 0]);             % G(τ,0,100)
-RoCp = smf(tau, [10 1000]);              % S(τ,10,1000)
-RoCm = zmf(tau,[-1000 -10]);             % Z(τ,–1000,–10)
+RoC0 = gaussmf(tau, cfg.mf.tau.roc0);
+RoCp = smf(   tau, cfg.mf.tau.rocp);
+RoCm = zmf(  tau, cfg.mf.tau.rocm);
 
-V_lo  = gaussmf(v,[50 0]);               % G(v,0,50)
-V_mid = gaussmf(v,[100 300]);            % G(v,300,100)
-V_hi  = gaussmf(v,[100 600]);            % G(v,600,100)
+% airspeed fuzzy-sets
+V_lo  = gaussmf(v, cfg.mf.v.lo);
+V_mid = gaussmf(v, cfg.mf.v.mid);
+V_hi  = gaussmf(v, cfg.mf.v.hi);
 
 P_gnd = gaussmf(p,[0.2 1]);              % G(p,1,0.2)
 P_clb = gaussmf(p,[0.2 2]);              % G(p,2,0.2)
@@ -39,50 +25,89 @@ P_cru = gaussmf(p,[0.2 3]);              % G(p,3,0.2)
 P_des = gaussmf(p,[0.2 4]);              % G(p,4,0.2)
 P_lvl = gaussmf(p,[0.2 5]);              % G(p,5,0.2)
 
-% 3) Plot the four‑panel figure
-figure;
+% Choose colour palettes
+cols3 = lines(3);          % three distinct colours, good for triplets
+cols5 = parula(5);         % five‐colour palette, for phases or larger sets
 
-% --- Altitude ---
-subplot(4,1,1);
-plot(eta, H_gnd, 'k-', 'LineWidth',2); hold on;
-plot(eta, H_lo,  'k--','LineWidth',2);
-plot(eta, H_hi,  'k:','LineWidth',2);
+% Parameters: width, height (in inches) and resolution (dpi)
+W = 12;   % width in inches
+H = 4;   % height in inches
+R = 300; % resolution in dpi
+
+%% --- Altitude ---
+fig1 = figure('Units','inches','Position',[1 1 W H], ...
+              'PaperUnits','inches','PaperPosition',[0 0 W H]);
+set(fig1,'Color','white');
+set(groot, ...
+    'defaultAxesColorOrder',cols3, ...
+    'defaultAxesLineStyleOrder','-|--|:');
+plot(eta, H_gnd,  'LineWidth',2); hold on;
+plot(eta, H_lo,   'LineWidth',2);
+plot(eta, H_hi,   'LineWidth',2);
+axis normal;        % ensure rectangular axes
 grid on;
-xlabel('Altitude (ft)');
-ylabel('Membership μ');
-title('Altitude');
+xlabel('Altitude (ft)','FontSize',12);
+ylabel('Membership \mu','FontSize',12);
+%title('Fuzzy set – Altitude','FontWeight','bold');
 legend('Ground','Low','High','Location','Best');
+%print(fig1,'-dpng',sprintf('-r%d',R),'fuzzyset_altitude.png');
 
-% --- RoC ---
-subplot(4,1,2);
-plot(tau, RoC0, 'k-', 'LineWidth',2); hold on;
-plot(tau, RoCp, 'k--','LineWidth',2);
-plot(tau, RoCm, 'k:','LineWidth',2);
+
+%% --- Rate of Climb ---
+fig2 = figure('Units','inches','Position',[1 1 W H], ...
+              'PaperUnits','inches','PaperPosition',[0 0 W H]);
+set(fig2,'Color','white');
+set(groot, ...
+    'defaultAxesColorOrder',cols3, ...
+    'defaultAxesLineStyleOrder','-|--|:');
+plot(tau, RoC0, 'LineWidth',2); hold on;
+plot(tau, RoCp, 'LineWidth',2);
+plot(tau, RoCm, 'LineWidth',2);
+axis normal;
 grid on;
-xlabel('RoC (ft/min)'); 
-ylabel('Membership μ');
-title('RoC');
+xlabel('RoC (ft/min)','FontSize',20);
+ylabel('Membership \mu','FontSize',20);
+%title('Fuzzy set – Rate of Climb','FontWeight','bold');
 legend('Zero','Positive','Negative','Location','Best');
+print(fig2,'-dpng',sprintf('-r%d',R),'fuzzyset_rateofclimb.png');
 
-% --- Speed ---
-subplot(4,1,3);
-plot(v, V_hi,  'k-', 'LineWidth',2); hold on;
-plot(v, V_mid, 'k--','LineWidth',2);
-plot(v, V_lo,  'k:','LineWidth',2);
-grid on;xlabel('Speed (kt)'); ylabel('Membership μ');
-title('Speed');
+
+%% --- Ground Speed ---
+fig3 = figure('Units','inches','Position',[1 1 W H], ...
+              'PaperUnits','inches','PaperPosition',[0 0 W H]);
+set(fig3,'Color','white');
+% Reverse so that High→warm, Medium→neutral, Low→cool
+plot(v, V_hi,  'Color',cols3(2,:),'LineWidth',2); hold on;
+plot(v, V_mid, 'Color',cols3(1,:),'LineWidth',2);
+plot(v, V_lo,  'Color',cols3(3,:),'LineWidth',2);
+axis normal;
+grid on;
+xlabel('Ground Speed (kt)','FontSize',20);
+ylabel('Membership \mu','FontSize',20);
+%title('Fuzzy set – Ground Speed','FontWeight','bold');
 legend('High','Medium','Low','Location','Best');
+print(fig3,'-dpng',sprintf('-r%d',R),'fuzzyset_groundspeed.png');
 
-% --- Phase ---
-%subplot(4,1,4);
-% Plot discrete markers at integer phase points
-%phases = 1:5;
-%plot(phases, P_gnd(phases*100), 'ks','MarkerSize',8,'LineWidth',2); hold on;
-%plot(phases, P_clb(phases*100), 'k^','MarkerSize',8,'LineWidth',2);
-%plot(phases, P_des(phases*100), 'kv','MarkerSize',8,'LineWidth',2);
-%plot(phases, P_cru(phases*100), 'kx','MarkerSize',8,'LineWidth',2);
-%plot(phases, P_lvl(phases*100), 'ko','MarkerSize',8,'LineWidth',2);
+%% --- Phase ---
+% figure;
+% % Use the parula(5) palette for the five discrete phase markers
+% phases = 1:5;
+% mk = {'s','^','v','x','o'};        % marker types
+% for i = 1:5
+%     plot(phases(i), ...
+%          [P_gnd;P_clb;P_cru;P_des;P_lvl](i), ...
+%          mk{i}, ...
+%          'MarkerSize',8, ...
+%          'LineWidth',2, ...
+%          'MarkerFaceColor',cols5(i,:), ...
+%          'MarkerEdgeColor','k'); hold on;
+% end
+% grid on; 
+% xlim([0.5 5.5]); ylim([0 1.2]);
+% set(gca, 'XTick', phases, ...
+%          'XTickLabel',{'Ground','Climb','Cruise','Descent','Level'}, ...
+%          'FontSize',10);
+% xlabel('Phase','FontSize',12); 
+% ylabel('Membership \mu','FontSize',12);
+% title('Phase','FontWeight','bold');
 
-%grid on;xlim([0.5 5.5]); ylim([0 1.2]);
-%set(gca, 'XTick', phases, 'XTickLabel',{'Ground','Climb','Descent','Cruise','Level flight'});xlabel('Phase'); ylabel('Membership μ');
-%title('Phase');

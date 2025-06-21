@@ -4,13 +4,13 @@ function tf = isValidFlight(callsign, airline, aircraftType, departures)
 
     % Trim whitespace
     csTrim = strtrim(string(callsign));
-    alTrim = strtrim(string(airline));
-    aircraftType=strtrim(string(aircraftType));
+    %alTrim = strtrim(string(airline));
+    acTrim=strtrim(string(aircraftType));
 
     % Conditions for invalid ID
-    condEmpty   = csTrim==""   || alTrim=="";
-    condPlace   = startsWith(csTrim, "@@@", "IgnoreCase", true) || startsWith(alTrim, "@@@", "IgnoreCase", true);
-    condNoDepartures=isempty(departures);
+    condEmpty   = any(csTrim=="");   %|| (alTrim==""));
+    condPlace   = any(startsWith(csTrim, "@@@", "IgnoreCase", true)); %|| startsWith(alTrim, "@@@", "IgnoreCase", true);
+    %condNoDepartures=isempty(departures);
     
     %Consider only Long range/wide-body/medium/short range jet aircraft and
     %turbo-prop airliner/freighter
@@ -31,7 +31,7 @@ function tf = isValidFlight(callsign, airline, aircraftType, departures)
         'A359', ... % Airbus A350-900
         'A388', ... % Airbus A380-800
         'A3ST', ... % Airbus Beluga
-        'A748'  ... % Antonov An-74 (Note: This is likely a typo in the source, as An-74 is not a long-range Airbus aircraft)
+        'A124'  ... % ANTONOV An-124 Ruslan (Note: This is likely a typo in the source, as An-74 is not a long-range Airbus aircraft)
     };
     
     % Manufacturer: Boeing
@@ -188,5 +188,5 @@ function tf = isValidFlight(callsign, airline, aircraftType, departures)
 ];
     condAcType = ismember(acTrim, allowedTypes);
     
-    tf = ~(condEmpty || condPlaceholder || condNoDepartures) && condAcType;
+    tf = ~(condEmpty || condPlace || condNoDepartures) && condAcType;
 end

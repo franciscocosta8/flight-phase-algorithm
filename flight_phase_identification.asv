@@ -5,6 +5,7 @@ load('results.mat');
 %% Stage 1 – Filter out invalid flights
 validIdx = arrayfun(@(f) isValidFlight(f.callsign, f.airline,f.acType ,f.departure), results);
 cleanFlights = results(validIdx);
+notcleanFlights = results(~validIdx);
 fprintf("Filtered to %d valid flights.\n", sum(validIdx));
 
 %% Stage 2 – Fuzzy Phase Identification per ADS-B Sample
@@ -15,6 +16,8 @@ voos = input('Insert flight index (ex: 1) or interval to be plot (ex: 1:3): ');
 if isempty(voos)
     disp('No selected flight. Program is not going to depict any figure.');
 end
+
+
 tic;
 cfg=config();
 N = numel(cleanFlights);
@@ -33,18 +36,21 @@ PdesVal = gaussmf(4, [0.2 4]);
 PlvlVal = gaussmf(5, [0.2 5]);
 PgoaVal = gaussmf(6, [0.2 6]);
 
-% Define input membership functions
-H_gnd = @(eta) zmf(eta, [30,   150]);         % Z(η,0,200)
-H_lo  = @(eta) gaussmf(eta, [10000,10000]);   % G(η,10000,10000)
-H_hi  = @(eta) gaussmf(eta, [20000,35000]);   % G(η,35000,20000)
+% Define input membership functions8
+% altitude fuzzy‐sets
+H_gnd = @(eta) zmf(eta,cfg.mf.eta.gnd);
+H_lo  = @(eta) gaussmf(eta, cfg.mf.eta.lo);
+H_hi  = @(eta) gaussmf(eta, cfg.mf.eta.hi);
 
-RoC0 = @(tau) gaussmf(tau, [100,   0]);      % G(τ,0,100) 165 used for flightData
-RoCp = @(tau) smf( tau, [10, 1000]);         % S(τ,10,1000)
-RoCm = @(tau) zmf( tau, [-1000, -10]);       % Z(τ,-1000,-10)
+% rate‐of‐climb fuzzy‐sets
+RoC0 = @(tau) gaussmf(tau, cfg.mf.tau.roc0);
+RoCp = @(tau) smf(tau,cfg.mf.tau.rocp);
+RoCm = @(tau) zmf( tau, cfg.mf.tau.rocm);
 
-V_lo  = @(v) gaussmf(v, [50,   0]);          % G(v,0,50)
-V_mid = @(v) gaussmf(v, [100, 300]);         % G(v,300,100)
-V_hi  = @(v) gaussmf(v, [100, 600]);         % G(v,600,100)
+% airspeed fuzzy‐sets
+V_lo  = @(v) gaussmf(v, cfg.mf.v.lo);
+V_mid = @(v) gaussmf(v, cfg.mf.v.mid);
+V_hi  = @(v) gaussmf(v, cfg.mf.v.hi);
 
 allOverallPhase = strings(1, N);
 % Loop over flights
@@ -78,7 +84,7 @@ parfor f=1:N
 
         % 2) Apply rules (6a)–(6e)
 
-        Sgnd = min([min(mu_gnd), PgndVal ]); %', mu_vlo, mu_roc0]' will not work since were turning down mmuch data
+        Sgnd = min([min(mu_gnd,mu_vlo), PgndVal ]); 
         Sclb = min([min([mu_lo, mu_vmid, mu_rocp]), PclbVal ]);
         Scru = min([min([mu_hi, mu_vhi,  mu_roc0]), PcruVal ]);
         Sdes = min([min([mu_lo, mu_vmid, mu_rocm]), PdesVal ]);
@@ -90,16 +96,17 @@ parfor f=1:N
         phaseStates(i) = FlightPhase(idx);
     end
 
+    descentFlags = (phaseStates == FlightPhase.Descent);
     % Identify Go Around
     if any(phaseStates == FlightPhase.Climb) && any(phaseStates == FlightPhase.Descent)
-        [phaseStates] = detectGoAround(time, alt, phaseStates, FlightPhase.Climb);
+        [phaseStates] = detectGoAround(time, alt, phaseStates, FlightPhase.Climb, descentFlags);
     else
         allStates{f}=phaseStates;
         labels= FlightPhase.list();     
         allStates_names{f} = labels(phaseStates);
     end
 
-    phaseStates = filterChangeOfPhase(phaseStates, FlightPhase.Climb, FlightPhase.Descent, FlightPhase.Level)
+    phaseStates = filterChangeOfPhase(phaseStates, FlightPhase.Climb, FlightPhase.Descent, FlightPhase.Level);
 
      % 2) remove points classified with climb or descent that are not
      % changing altitude
@@ -131,11 +138,11 @@ parfor f=1:N
         nLevel  = sum(phaseStates == FlightPhase.Level);
 
         altFirst = alt(1);
-        altLast  = alt(end);
+        altLast = mean( alt( max(end-10,1) : end ) );
 
         % (b1) Critério para Landing:
         %      • mais pontos de descent do que de climb 
-        %      • e o último ponto de altitude < 2200 ft
+        %      • e a média dos últimos 10 pontos de altitude < 2200 ft
         if (nDes > nClimb) && (altLast < 2200)
             allOverallPhase(f) = string(FlightOverallPhase.Landing);
 
@@ -151,9 +158,8 @@ parfor f=1:N
         elseif (nLevel > nClimb) && (nLevel > nDes) && (altFirst > 5000) && (altLast > 5000)
             allOverallPhase(f) = string(FlightOverallPhase.Cruise);
 
-        % (b4) Se nenhuma condição anterior for satisfeita, você pode atribuir um
-        %      valor default, por exemplo Cruise ou Ground — adapte conforme
-        %      achar melhor para o seu caso.
+        % (b4) Se nenhuma condição anterior for satisfeita, atribuir um
+        %      valor default, por exemplo Cruise ou Ground 
         else
             allOverallPhase(f) = string(FlightOverallPhase.Cruise); 
         end

@@ -1,21 +1,21 @@
 function summaryPhases = summarizePhases(allOverallPhase)
-% summarizePhases    Conta e retorna índices e quantidades de cada fase "global" de um conjunto de voos
+% summarizePhases   Evaluate the amount of flights that have each phase
 %   Input:
-%       allOverallPhase - vetor de strings (1xN) contendo as fases globais de cada voo
-%                         Os valores esperados são:
+%       allOverallPhase - strings vector (1xN) 
+%                         Expected values:
 %                         "Landing", "Takeoff", "Cruise", "LandingWithGoAround"
 %   Output:
 %       summaryPhases - struct com os campos:
-%           nLandings       - número de voos classificados como Landing
-%           landingIndices  - índices dos voos Landing
-%           nTakeoffs       - número de voos classificados como Takeoff
-%           takeoffIndices  - índices dos voos Takeoff
-%           nCruises        - número de voos classificados como Cruise
-%           cruiseIndices   - índices dos voos Cruise
-%           nGoArounds      - número de voos classificados como LandingWithGoAround
-%           goAroundIndices - índices dos voos LandingWithGoAround
+%           nLandings       - flights named as Landing
+%           landingIndices  - flight index -> Landing
+%           nTakeoffs       - flights named as Takeoff
+%           takeoffIndices  - flight index -> Takeoff
+%           nCruises        - flights named as Cruise
+%           cruiseIndices   - flight index -> Cruise
+%           nGoArounds      - flights named as LandingWithGoAround
+%           goAroundIndices - flight index -> LandingWithGoAround
 
-    % Encontrar índices para cada fase
+    % Find index to each phase
     landingIdx    = find(allOverallPhase == "Landing");
     nLandings     = numel(landingIdx);
 
@@ -28,7 +28,7 @@ function summaryPhases = summarizePhases(allOverallPhase)
     goAroundIdx   = find(allOverallPhase == "LandingWithGoAround");
     nGoArounds    = numel(goAroundIdx);
 
-    % Montar struct de saída
+    % Exit strutct
     summaryPhases.nLandings       = nLandings;
     summaryPhases.landingIndices  = landingIdx;
     summaryPhases.nTakeoffs       = nTakeoffs;

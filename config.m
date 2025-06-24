@@ -27,7 +27,7 @@ function cfg = config()
 % — η (altitude) — 
 %    • ZMF:  zmf(x, [a b])
 %    • gaussmf(x,[σ μ])  (MATLAB’s convention is [σ μ])
-cfg.mf.eta.gnd = [   0,    200];    % Z(η; 0,300)
+cfg.mf.eta.gnd = [   0,    300];    % Z(η; 0,300)
 cfg.mf.eta.lo  = [10000, 10000];    % G(η; 10000,10000)
 cfg.mf.eta.hi  = [20000, 35000];    % G(η; 35000,20000)
 

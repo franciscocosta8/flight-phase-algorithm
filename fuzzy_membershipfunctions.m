@@ -30,7 +30,7 @@ cols3 = lines(3);          % three distinct colours, good for triplets
 cols5 = parula(5);         % five‐colour palette, for phases or larger sets
 
 % Parameters: width, height (in inches) and resolution (dpi)
-W = 12;   % width in inches
+W = 14;   % width in inches
 H = 4;   % height in inches
 R = 300; % resolution in dpi
 
@@ -50,7 +50,7 @@ xlabel('Altitude (ft)','FontSize',12);
 ylabel('Membership \mu','FontSize',12);
 %title('Fuzzy set – Altitude','FontWeight','bold');
 legend('Ground','Low','High','Location','Best');
-%print(fig1,'-dpng',sprintf('-r%d',R),'fuzzyset_altitude.png');
+print(fig1,'-dpng',sprintf('-r%d',R),'fuzzyset_altitude.png');
 
 
 %% --- Rate of Climb ---

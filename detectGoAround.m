@@ -13,6 +13,7 @@ function phaseStates = detectGoAround(time, alt, phaseStates, climbPhase, descen
     minGain       = 500;    % ft
     maxGain       = 4000;   % ft
     altMax        = 5500;   % ft
+    altMin        = 3500;
     maxTime       = 300;    % s
 
     % your new gate parameter
@@ -47,7 +48,7 @@ function phaseStates = detectGoAround(time, alt, phaseStates, climbPhase, descen
         gain = alt(idx(end)) - alt(idx(1));
         dur  = t1 - t0;
 
-        if minGain <= gain && gain <= maxGain && ...
+        if minGain <= gain && gain <= maxGain && min(alt(idx))<=altMin && ...
            max(alt(idx)) <= altMax && dur <= maxTime
             phaseStates(idx) = FlightPhase.GoAroundClimb;
         end

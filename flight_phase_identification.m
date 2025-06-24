@@ -1,215 +1,211 @@
 %% Flight Phase Identification Pipeline
 % Load results and filter invalid flights
 load('results.mat');
+%% 
+folder    = 'jan25';
+fileList  = dir(fullfile(folder,'*.mat'));
+Nfiles    = numel(fileList);
+%results   = repmat(struct(), 1, Nfiles);  % pré-aloca um array de structs
+dailySummaries = cell(1, Nfiles);
 
-%% Stage 1 – Filter out invalid flights
-validIdx = arrayfun(@(f) isValidFlight(f.callsign, f.airline,f.acType ,f.departure), results);
-cleanFlights = results(validIdx);
-notcleanFlights = results(~validIdx);
-fprintf("Filtered to %d valid flights.\n", sum(validIdx));
-
-%% Stage 2 – Fuzzy Phase Identification per ADS-B Sample
-
-voos = input('Insert flight index (ex: 1) or interval to be plot (ex: 1:3): ');
-
-% Valida entrada
-if isempty(voos)
-    disp('No selected flight. Program is not going to depict any figure.');
-end
-
-
-tic;
+%%
+tic
 cfg=config();
-N = numel(cleanFlights);
-allStates = cell(1, N);
 % Define lineear spaces
 eta = cfg.eta;      % altitude in feet
 tau = cfg.tau;   % rate of climb in ft/min
 v   = cfg.v;        % speed in knots
 p   = cfg.p;          % phase axis (0 to 6)
 
-% Precompute phase membership values P(P)
-PgndVal = gaussmf(1, [0.2 1]);
-PclbVal = gaussmf(2, [0.2 2]);
-PcruVal = gaussmf(3, [0.2 3]);
-PdesVal = gaussmf(4, [0.2 4]);
-PlvlVal = gaussmf(5, [0.2 5]);
-PgoaVal = gaussmf(6, [0.2 6]);
+for k = 5:6%:Nfiles
 
-% Define input membership functions8
-% altitude fuzzy‐sets
-H_gnd = @(eta) zmf(eta,cfg.mf.eta.gnd);
-H_lo  = @(eta) gaussmf(eta, cfg.mf.eta.lo);
-H_hi  = @(eta) gaussmf(eta, cfg.mf.eta.hi);
-
-% rate‐of‐climb fuzzy‐sets
-RoC0 = @(tau) gaussmf(tau, cfg.mf.tau.roc0);
-RoCp = @(tau) smf(tau,cfg.mf.tau.rocp);
-RoCm = @(tau) zmf( tau, cfg.mf.tau.rocm);
-
-% airspeed fuzzy‐sets
-V_lo  = @(v) gaussmf(v, cfg.mf.v.lo);
-V_mid = @(v) gaussmf(v, cfg.mf.v.mid);
-V_hi  = @(v) gaussmf(v, cfg.mf.v.hi);
-
-allOverallPhase = strings(1, N);
-% Loop over flights
-parfor f=1:N
-    T = cleanFlights(f).flightData ;  %can be changed to smootherMean or flightData
-    time = T.time;
-    alt = T.h_QNH_Metar;     % altitude (ft) %apply 1600 for test purposes only
-    roc = T.h_dot_baro;      % RoC (ft/min)
-    gs  = T.gs;              % ground speed (kt)
-    validSamples = isfinite(alt) & isfinite(roc) & isfinite(gs);
-    time=time(validSamples);
-    roc = roc(validSamples);
-    alt = alt(validSamples);
-    gs  = gs(validSamples);
+    fn = fullfile(folder, fileList(k).name);
+    load(fn); 
+    validIdx = arrayfun(@(f) isValidFlight(f.callsign, f.airline,f.acType ,f.departure), results);
+    cleanFlights = results(validIdx);
+    notcleanFlights = results(~validIdx);
+    fprintf("Filtered to %d valid flights.\n", sum(validIdx));
     
-    %[keep, removedIdx] = derivative_filter(time, roc, cfg.thr_acc, cfg.tolerance, cfg.cap);
+    % Stage 2 – Fuzzy Phase Identification per ADS-B Sample
+    k
+    % voos = input('Insert flight index (ex: 1) or interval to be plot (ex: 1:3): ');
+    % 
+    % % Valida entrada
+    % if isempty(voos)
+    %     disp('No selected flight. Program is not going to depict any figure.');
+    % end
     
-    n   = numel(alt);
-    phaseStates = repmat( FlightPhase.Ground, n, 1 );
-    for i = 1:n        
-        % 1) Compute input memberships
-        mu_gnd  = H_gnd(alt(i));
-        mu_lo   = H_lo(alt(i));
-        mu_hi   = H_hi(alt(i));
-        mu_roc0 = RoC0(roc(i));
-        mu_rocp = RoCp(roc(i));
-        mu_rocm = RoCm(roc(i));
-        mu_vlo  = V_lo(gs(i));
-        mu_vmid = V_mid(gs(i));
-        mu_vhi  = V_hi(gs(i));
-
-        % 2) Apply rules (6a)–(6e)
-
-        Sgnd = min([min(mu_gnd,mu_vlo), PgndVal ]); 
-        Sclb = min([min([mu_lo, mu_vmid, mu_rocp]), PclbVal ]);
-        Scru = min([min([mu_hi, mu_vhi,  mu_roc0]), PcruVal ]);
-        Sdes = min([min([mu_lo, mu_vmid, mu_rocm]), PdesVal ]);
-        Slvl = min([min([mu_lo, mu_vmid, mu_roc0]), PlvlVal ]);
-
-        % 3) Defuzzify (7f) and round (8)
-        scores = [Sgnd, Sclb, Scru, Sdes, Slvl];
-        [~, idx] = max(scores);
-        phaseStates(i) = FlightPhase(idx);
-    end
-
-    descentFlags = (phaseStates == FlightPhase.Descent);
-    % Identify Go Around
-    if any(phaseStates == FlightPhase.Climb) && any(phaseStates == FlightPhase.Descent)
-        [phaseStates] = detectGoAround(time, alt, phaseStates, FlightPhase.Climb, descentFlags);
-    else
+    
+    
+    N = numel(cleanFlights);
+    allStates = cell(1, N);
+    allOverallPhase = strings(N,1);
+    allAirlines     = strings(N,1);
+    allAircraft     = strings(N,1);
+    
+    
+    % Loop over flights
+    parfor f=1:N
+    %for f=goaround;
+        T = cleanFlights(f).flightData;
+    
+        if all(isnan(T.h_QNH_Metar) ) || all(isnan(T.h_dot_baro)) || all(isnan(T.gs))
+            continue
+        end
+    
+        validSamples=isfinite(T.h_dot_baro) & isfinite(T.gs) & isfinite(T.h_QNH_Metar);
+    
+        if sum(validSamples)<25
+           continue
+        end
+    
+        alt   = T.h_QNH_Metar(validSamples);
+        roc   = T.h_dot_baro(validSamples);
+        gs    = T.gs(validSamples);
+        isGnd = T.onGround(validSamples);
+        time = T.time(validSamples);
+    
+        phaseStates = classifyFlightPhase(T, cfg);
+        if isempty(phaseStates)
+            continue;
+        end
+        alt=T.h_QNH_Metar (validSamples);
+        roc   = T.h_dot_baro (validSamples);
+        gs    = T.gs(validSamples);
+        isGnd = T.onGround(validSamples); 
+        time=T.time;
+    
+        descentFlags = (phaseStates == FlightPhase.Descent);
+        % Identify Go Around
+        if any(phaseStates == FlightPhase.Climb) && any(phaseStates == FlightPhase.Descent)
+            [phaseStates] = detectGoAround(time, alt, phaseStates, FlightPhase.Climb, descentFlags);
+        else
+            allStates{f}=phaseStates;
+            labels= FlightPhase.list();    
+            allStates_names{f} = labels(phaseStates);
+        end
+    
+        phaseStates = filterChangeOfPhase(phaseStates, FlightPhase.Climb, FlightPhase.Descent, FlightPhase.Level);
+    
+         % remove points classified with climb or descent that are not
+         % changing altitude
+        [keepIdx,phaseStates] = filterFlatClimbDescent(alt, phaseStates);
+        t_removed=time(~keepIdx);
+        alt_removed=alt(~keepIdx);
+    
+        % Agora refazemos todos os vetores “time, roc, alt, gs, phaseStates”
+        time = time(keepIdx);
+        roc  = roc(keepIdx);
+        alt  = alt(keepIdx);
+        gs   = gs(keepIdx);
+        phaseStates = phaseStates(keepIdx);
+    
         allStates{f}=phaseStates;
         labels= FlightPhase.list();     
         allStates_names{f} = labels(phaseStates);
-    end
-
-    phaseStates = filterChangeOfPhase(phaseStates, FlightPhase.Climb, FlightPhase.Descent, FlightPhase.Level);
-
-     % 2) remove points classified with climb or descent that are not
-     % changing altitude
-    [keepIdx,phaseStates] = filterFlatClimbDescent(alt, phaseStates);
-    t_removed=time(~keepIdx);
-    alt_removed=alt(~keepIdx);
-
-    % Agora refazemos todos os vetores “time, roc, alt, gs, phaseStates”
-    time = time(keepIdx);
-    roc  = roc(keepIdx);
-    alt  = alt(keepIdx);
-    gs   = gs(keepIdx);
-    phaseStates = phaseStates(keepIdx);
-
-    allStates{f}=phaseStates;
-    labels= FlightPhase.list();     
-    allStates_names{f} = labels(phaseStates);
-
-    % Decidir fase global de voo
-
-    hasGoAround = any(phaseStates == FlightPhase.GoAroundClimb);
-
-    if hasGoAround
-        allOverallPhase(f) = string(FlightOverallPhase.LandingWithGoAround);
-    else
-        % (b) Caso não haja Go-Around, contamos quantos pontos de cada fase
-        nClimb  = sum(phaseStates == FlightPhase.Climb);
-        nDes    = sum(phaseStates == FlightPhase.Descent);
-        nLevel  = sum(phaseStates == FlightPhase.Level);
-
-        altFirst = alt(1);
-        altLast = mean( alt( max(end-10,1) : end ) );
-
-        % (b1) Critério para Landing:
-        %      • mais pontos de descent do que de climb 
-        %      • e a média dos últimos 10 pontos de altitude < 2200 ft
-        if (nDes > nClimb) && (altLast < 2200)
-            allOverallPhase(f) = string(FlightOverallPhase.Landing);
-
-        % (b2) Critério para Take-off:
-        %      • mais pontos de climb do que de descent 
-        %      • e o último ponto de altitude > 5000 ft
-        elseif (nClimb > nDes) && (altLast > 5000)
-            allOverallPhase(f) = string(FlightOverallPhase.Takeoff);
-
-        % (b3) Critério para Cruise:
-        %      • mais pontos level flight do que climb e descent
-        %      • e o primeiro e o último ponto de altitude devem estar > 5000 ft
-        elseif (nLevel > nClimb) && (nLevel > nDes) && (altFirst > 5000) && (altLast > 5000)
-            allOverallPhase(f) = string(FlightOverallPhase.Cruise);
-
-        % (b4) Se nenhuma condição anterior for satisfeita, atribuir um
-        %      valor default, por exemplo Cruise ou Ground 
+    
+        % Decidir fase global de voo
+        
+        hasGoAround = any(phaseStates == FlightPhase.GoAroundClimb);  
+        if hasGoAround
+            allOverallPhase(f) = string(FlightOverallPhase.GoAround);
         else
-            allOverallPhase(f) = string(FlightOverallPhase.Cruise); 
-        end
-    end
-
-
-    % Plot desired flights
-    if ismember(f, voos)
-        rawStates = allStates_names{f};     
-        rawStates = cellstr(rawStates(:));  
-
-        [grp, grpNames] = findgroups(rawStates);
-        cmap = cell2mat(values(cfg.phase2color, grpNames));
     
+            % (b) Caso não haja Go-Around, contamos quantos pontos de cada fase
+            nClimb  = sum(phaseStates == FlightPhase.Climb);
+            nDes    = sum(phaseStates == FlightPhase.Descent);
+            nLevel  = sum(phaseStates == FlightPhase.Level);
     
-        % cria figura e ax1
-        hFig = figure('Position',[100 100 1000 500]);
-        ax1 = axes('Parent', hFig);
-        hold(ax1, 'on');
-        
-        %  linha de altitude estimada
-        %alt_est = interp1(t, alt, t0, 'pchip');
-        %plot(ax1, t0, alt_est, '-', 'LineWidth',1.5, ...
-        %     'Color',[0 0 0], 'DisplayName','Estimated altitude');
-        
-        %pontos removidos
-        %scatter(ax1, t_removed, alt_removed, 36, 'r', 'x', ...
-         %      'DisplayName','Removed points');
-        
-        %  loop de scatter para cada fase
-        for i = 1:numel(grpNames)
-            xi = grp == i;
-            scatter(ax1, time(xi), alt(xi), 100, ...
-                    'Marker', '.', ...
-                    'MarkerEdgeColor', cmap(i,:), ...
-                    'DisplayName', grpNames{i});
+            altFirst = alt(1);
+            altLast = mean( alt( max(end-10,1) : end ) );
+    
+
+            if (nDes > nClimb) && (altLast < 2200)
+                allOverallPhase(f) = string(FlightOverallPhase.Landing);
+    
+            elseif (nClimb > nDes) && (altLast > 5000) && (altFirst<3500)
+                allOverallPhase(f) = string(FlightOverallPhase.Takeoff);
+
+            elseif  (altFirst > 5000) && (altLast > 5000)
+                allOverallPhase(f) = string(FlightOverallPhase.Cruise);
+   
+            else
+                allOverallPhase(f) = string(FlightOverallPhase.NonDetected); 
+            end
         end
-        
-        % 4) ajustes finais
-        ylabel(ax1, 'Altitude (ft)');
-        ylim(ax1, [min(alt)-500, max(alt)+500]);
-        datetick(ax1, 'x', 'HH:MM', 'keepticks');
-        xlabel(ax1, 'Time');
-        title(ax1, sprintf("Flight %s (idx %d)", cleanFlights(f).callsign, f));
-        legend(ax1, 'Location', 'eastoutside');
-        grid(ax1, 'on');
+
+        allAirlines(f) = string(cleanFlights(f).airline);
+        allAircraft(f) = string(cleanFlights(f).acType);
+
+        % % Plot desired flights
+        % if ismember(f, voos)
+            % rawStates = allStates_names{f};     
+            % rawStates = cellstr(rawStates(:));  
+            % 
+            % [grp, grpNames] = findgroups(rawStates);
+            % cmap = cell2mat(values(cfg.phase2color, grpNames));
+            % 
+            % 
+            % % cria figura e ax1
+            % hFig = figure('Position',[100 100 1000 500]);
+            % ax1 = axes('Parent', hFig);
+            % hold(ax1, 'on');
+            % 
+            % %  linha de altitude estimada
+            % %alt_est = interp1(t, alt, t0, 'pchip');
+            % %plot(ax1, t0, alt_est, '-', 'LineWidth',1.5, ...
+            % %     'Color',[0 0 0], 'DisplayName','Estimated altitude');
+            % 
+            % %pontos removidos
+            % %scatter(ax1, t_removed, alt_removed, 36, 'r', 'x', ...
+            %  %      'DisplayName','Removed points');
+            % 
+            % %  loop de scatter para cada fase
+            % for i = 1:numel(grpNames)
+            %     xi = grp == i;
+            %     scatter(ax1, time(xi), alt(xi), 100, ...
+            %             'Marker', '.', ...
+            %             'MarkerEdgeColor', cmap(i,:), ...
+            %             'DisplayName', grpNames{i});
+            % end
+            % 
+            % % 4) ajustes finais
+            % ylabel(ax1, 'Altitude (ft)');
+            % ylim(ax1, [min(alt)-500, max(alt)+500]);
+            % datetick(ax1, 'x', 'HH:MM', 'keepticks');
+            % xlabel(ax1, 'Time');
+            % title(ax1, sprintf("Flight %s (idx %d)", cleanFlights(f).callsign, f));
+            % legend(ax1, 'Location', 'eastoutside');
+            % grid(ax1, 'on');
+        % end
     end
+    summaryPhases = summarizePhases(allOverallPhase);
+    % —— FAST COUNTS BY AIRLINE —— 
+    [G1, PhaseLevels1, AirlineLevels] = findgroups(allOverallPhase, allAirlines);
+    countsPA = splitapply(@numel, allOverallPhase, G1);
+    countsByAirline = table(PhaseLevels1, AirlineLevels, countsPA, ...
+        'VariableNames', {'Phase','Airline','Count'});
+
+    % —— FAST COUNTS BY AIRCRAFT —— 
+    [G2, PhaseLevels2, AircraftLevels] = findgroups(allOverallPhase, allAircraft);
+    countsPC = splitapply(@numel, allOverallPhase, G2);
+    countsByAircraft = table(PhaseLevels2, AircraftLevels, countsPC, ...
+        'VariableNames', {'Phase','Aircraft','Count'});
+
+    % Store everything in your daily summary
+    dailySummaries{k} = struct( ...
+        'file',             fileList(k).name, ...
+        'summary',          summaryPhases, ...
+        'countsByAirline',  countsByAirline, ...
+        'countsByAircraft', countsByAircraft ...
+    );
 end
 
-summaryPhases = summarizePhases(allOverallPhase);
+% After loop, concatenate all per‐file summaries:
+%allFilesSummary = vertcat(dailySummaries{:});
+toc
+    
+
 
 disp('Program finished.')
 toc

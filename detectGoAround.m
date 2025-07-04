@@ -11,7 +11,7 @@ function phaseStates = detectGoAround(time, alt, phaseStates, climbPhase, descen
 
     % hard‐coded go‐around thresholds
     minGain       = 500;    % ft
-    maxGain       = 4000;   % ft
+%    maxGain       = 4000;   % ft
     altMax        = 5500;   % ft
     altMin        = 3500;
     maxTime       = 300;    % s
@@ -48,7 +48,7 @@ function phaseStates = detectGoAround(time, alt, phaseStates, climbPhase, descen
         gain = alt(idx(end)) - alt(idx(1));
         dur  = t1 - t0;
 
-        if minGain <= gain && gain <= maxGain && min(alt(idx))<=altMin && ...
+        if minGain <= gain && min(alt(idx))<=altMin && ...
            max(alt(idx)) <= altMax && dur <= maxTime
             phaseStates(idx) = FlightPhase.GoAroundClimb;
         end

@@ -42,28 +42,25 @@ function phaseStates = classifyFlightPhase(T, cfg)
     V_hi  = @(v) gaussmf(v, cfg.mf.v.hi);
 
     %–– 5) Loop through each sample and apply rules + defuzzify
-    for i = 1:n
-        mu_gnd  = H_gnd(alt(i));
-        mu_lo   = H_lo(alt(i));
-        mu_hi   = H_hi(alt(i));
-        mu_roc0 = RoC0(roc(i));
-        mu_rocp = RoCp(roc(i));
-        mu_rocm = RoCm(roc(i));
-        mu_vlo  = V_lo(gs(i));
-        mu_vmid = V_mid(gs(i));
-        mu_vhi  = V_hi(gs(i));
+    mu_gnd  = H_gnd(alt); 
+    mu_lo   = H_lo(alt);     
+    mu_hi   = H_hi(alt);     
+    mu_roc0 = RoC0(roc);     
+    mu_rocp = RoCp(roc);     
+    mu_rocm = RoCm(roc);     
+    mu_vlo  = V_lo(gs);      
+    mu_vmid = V_mid(gs);     
+    mu_vhi  = V_hi(gs);     
 
         % Apply rules 
+    Sgnd = mu_gnd;
+    Sclb = min([mu_lo,  mu_vmid, mu_rocp], [], 2);
+    Scru = min([mu_hi,  mu_vhi,  mu_roc0], [], 2);
+    Sdes = min([mu_lo,  mu_vmid, mu_rocm], [], 2);
+    Slvl = min([mu_lo,  mu_vmid, mu_roc0], [], 2);
 
-        Sgnd = min([min([mu_gnd]) ]); % only considered becauuse mu_vlow could be so low that doesnt represent well
-        Sclb = min([min([mu_lo, mu_vmid, mu_rocp]) ]);
-        Scru = min([min([mu_hi, mu_vhi,  mu_roc0]) ]);
-        Sdes = min([min([mu_lo, mu_vmid, mu_rocm]) ]);
-        Slvl = min([min([mu_lo, mu_vmid, mu_roc0]) ]);
-
-        % 3) Defuzzify 
-        scores = [Sgnd, Sclb, Scru, Sdes, Slvl];
-        [~, idx] = max(scores);
-        phaseStates(i) = FlightPhase(idx);
-    end
+    % 3) Defuzzify 
+    scores = [Sgnd, Sclb, Scru, Sdes, Slvl];
+    [~, idx] = max(scores, [], 2);
+    phaseStates = FlightPhase(idx);
 end

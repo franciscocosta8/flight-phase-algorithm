@@ -1,6 +1,6 @@
 %% Flight Phase Identification Pipeline
 % Load results and filter invalid flights
-load('results.mat');
+%load('results.mat');
 %% 
 folder    = 'jan25';
 fileList  = dir(fullfile(folder,'*.mat'));
@@ -11,42 +11,44 @@ dailySummaries = cell(1, Nfiles);
 %%
 tic
 cfg=config();
-% Define lineear spaces
-eta = cfg.eta;      % altitude in feet
-tau = cfg.tau;   % rate of climb in ft/min
-v   = cfg.v;        % speed in knots
-p   = cfg.p;          % phase axis (0 to 6)
+labels = FlightPhase.list();
 
-for k = 5:6%:Nfiles
-
+for k = 18%1:Nfiles
+    
+    k
     fn = fullfile(folder, fileList(k).name);
     load(fn); 
     validIdx = arrayfun(@(f) isValidFlight(f.callsign, f.airline,f.acType ,f.departure), results);
     cleanFlights = results(validIdx);
     notcleanFlights = results(~validIdx);
     fprintf("Filtered to %d valid flights.\n", sum(validIdx));
-    
-    % Stage 2 – Fuzzy Phase Identification per ADS-B Sample
-    k
-    % voos = input('Insert flight index (ex: 1) or interval to be plot (ex: 1:3): ');
-    % 
-    % % Valida entrada
-    % if isempty(voos)
-    %     disp('No selected flight. Program is not going to depict any figure.');
-    % end
-    
-    
-    
+
     N = numel(cleanFlights);
     allStates = cell(1, N);
     allOverallPhase = strings(N,1);
     allAirlines     = strings(N,1);
     allAircraft     = strings(N,1);
-    
+    allLat           = cell(1, N);
+    allLon           = cell(1, N);
+    allAlt           = cell(1, N);
+    allGS            = cell(1, N);
+    allROC           = cell(1, N);
+    flightPhases = repmat(struct( ...
+        'callsign',    "", ...
+        'rawStates',   [], ...
+        'stateNames',  string.empty, ...
+        'overallPhase', "", ...
+        'airline',     "", ...
+        'aircraft',     "", ...
+        'latitude',     [], ...      
+        'longitude',    [], ...
+        'altitude',     [], ...
+        'groundSpeed',  [], ...
+        'rateOfClimb',  [] ), N, 1); 
     
     % Loop over flights
     parfor f=1:N
-    %for f=goaround;
+    %for f=17
         T = cleanFlights(f).flightData;
     
         if all(isnan(T.h_QNH_Metar) ) || all(isnan(T.h_dot_baro)) || all(isnan(T.gs))
@@ -64,6 +66,9 @@ for k = 5:6%:Nfiles
         gs    = T.gs(validSamples);
         isGnd = T.onGround(validSamples);
         time = T.time(validSamples);
+        lat_all = T.lat(validSamples);    % extract raw latitude
+        lon_all = T.lon(validSamples);   % extract raw longitude
+
     
         phaseStates = classifyFlightPhase(T, cfg);
         if isempty(phaseStates)
@@ -73,12 +78,12 @@ for k = 5:6%:Nfiles
         roc   = T.h_dot_baro (validSamples);
         gs    = T.gs(validSamples);
         isGnd = T.onGround(validSamples); 
-        time=T.time;
+        time_all=T.time;
     
         descentFlags = (phaseStates == FlightPhase.Descent);
         % Identify Go Around
         if any(phaseStates == FlightPhase.Climb) && any(phaseStates == FlightPhase.Descent)
-            [phaseStates] = detectGoAround(time, alt, phaseStates, FlightPhase.Climb, descentFlags);
+            [phaseStates] = detectGoAround(time_all, alt, phaseStates, FlightPhase.Climb, descentFlags);
         else
             allStates{f}=phaseStates;
             labels= FlightPhase.list();    
@@ -99,6 +104,14 @@ for k = 5:6%:Nfiles
         alt  = alt(keepIdx);
         gs   = gs(keepIdx);
         phaseStates = phaseStates(keepIdx);
+        lat = lat_all(keepIdx);
+        lon = lon_all(keepIdx);
+
+        allLat{f} = lat;
+        allLon{f} = lon;
+        allAlt{f} = alt;
+        allGS{f}  = gs;
+        allROC{f} = roc;
     
         allStates{f}=phaseStates;
         labels= FlightPhase.list();     
@@ -137,75 +150,30 @@ for k = 5:6%:Nfiles
         allAirlines(f) = string(cleanFlights(f).airline);
         allAircraft(f) = string(cleanFlights(f).acType);
 
-        % % Plot desired flights
-        % if ismember(f, voos)
-            % rawStates = allStates_names{f};     
-            % rawStates = cellstr(rawStates(:));  
-            % 
-            % [grp, grpNames] = findgroups(rawStates);
-            % cmap = cell2mat(values(cfg.phase2color, grpNames));
-            % 
-            % 
-            % % cria figura e ax1
-            % hFig = figure('Position',[100 100 1000 500]);
-            % ax1 = axes('Parent', hFig);
-            % hold(ax1, 'on');
-            % 
-            % %  linha de altitude estimada
-            % %alt_est = interp1(t, alt, t0, 'pchip');
-            % %plot(ax1, t0, alt_est, '-', 'LineWidth',1.5, ...
-            % %     'Color',[0 0 0], 'DisplayName','Estimated altitude');
-            % 
-            % %pontos removidos
-            % %scatter(ax1, t_removed, alt_removed, 36, 'r', 'x', ...
-            %  %      'DisplayName','Removed points');
-            % 
-            % %  loop de scatter para cada fase
-            % for i = 1:numel(grpNames)
-            %     xi = grp == i;
-            %     scatter(ax1, time(xi), alt(xi), 100, ...
-            %             'Marker', '.', ...
-            %             'MarkerEdgeColor', cmap(i,:), ...
-            %             'DisplayName', grpNames{i});
-            % end
-            % 
-            % % 4) ajustes finais
-            % ylabel(ax1, 'Altitude (ft)');
-            % ylim(ax1, [min(alt)-500, max(alt)+500]);
-            % datetick(ax1, 'x', 'HH:MM', 'keepticks');
-            % xlabel(ax1, 'Time');
-            % title(ax1, sprintf("Flight %s (idx %d)", cleanFlights(f).callsign, f));
-            % legend(ax1, 'Location', 'eastoutside');
-            % grid(ax1, 'on');
-        % end
+        flightPhases(f).callsign     = string(cleanFlights(f).callsign);
+        flightPhases(f).rawStates    = allStates{f};             % numeric codes
+        flightPhases(f).stateNames   = allStates_names{f};       % e.g. "Climb","Level",…
+        flightPhases(f).overallPhase = allOverallPhase(f);       % e.g. "Takeoff","Cruise",…
+        flightPhases(f).airline      = allAirlines(f);
+        flightPhases(f).aircraft     = allAircraft(f);
+        flightPhases(f).latitude     = allLat{f};    % degrees
+        flightPhases(f).longitude    = allLon{f};    % degrees
+        flightPhases(f).altitude     = allAlt{f};    % ft (h_QNH_Metar)
+        flightPhases(f).groundSpeed  = allGS{f};     % kts
+        flightPhases(f).rateOfClimb  = allROC{f};    % ft/s
+
     end
     summaryPhases = summarizePhases(allOverallPhase);
-    % —— FAST COUNTS BY AIRLINE —— 
-    [G1, PhaseLevels1, AirlineLevels] = findgroups(allOverallPhase, allAirlines);
-    countsPA = splitapply(@numel, allOverallPhase, G1);
-    countsByAirline = table(PhaseLevels1, AirlineLevels, countsPA, ...
-        'VariableNames', {'Phase','Airline','Count'});
-
-    % —— FAST COUNTS BY AIRCRAFT —— 
-    [G2, PhaseLevels2, AircraftLevels] = findgroups(allOverallPhase, allAircraft);
-    countsPC = splitapply(@numel, allOverallPhase, G2);
-    countsByAircraft = table(PhaseLevels2, AircraftLevels, countsPC, ...
-        'VariableNames', {'Phase','Aircraft','Count'});
 
     % Store everything in your daily summary
     dailySummaries{k} = struct( ...
         'file',             fileList(k).name, ...
         'summary',          summaryPhases, ...
-        'countsByAirline',  countsByAirline, ...
-        'countsByAircraft', countsByAircraft ...
-    );
+        'flightPhases', flightPhases);
 end
 
 % After loop, concatenate all per‐file summaries:
 %allFilesSummary = vertcat(dailySummaries{:});
-toc
-    
-
 
 disp('Program finished.')
 toc

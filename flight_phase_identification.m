@@ -2,7 +2,7 @@
 % Load results and filter invalid flights
 %load('results.mat');
 %% 
-folder    = 'jan25';
+folder    = 'jun24';
 fileList  = dir(fullfile(folder,'*.mat'));
 Nfiles    = numel(fileList);
 %results   = repmat(struct(), 1, Nfiles);  % pré-aloca um array de structs
@@ -13,12 +13,12 @@ tic
 cfg=config();
 labels = FlightPhase.list();
 
-for k = 18%1:Nfiles
+for k =1:Nfiles
     
     k
     fn = fullfile(folder, fileList(k).name);
     load(fn); 
-    validIdx = arrayfun(@(f) isValidFlight(f.callsign, f.airline,f.acType ,f.departure), results);
+    validIdx = arrayfun(@(f) isValidFlight(f.callsign, f.airline,f.acType,f.smootherMean), results);
     cleanFlights = results(validIdx);
     notcleanFlights = results(~validIdx);
     fprintf("Filtered to %d valid flights.\n", sum(validIdx));
@@ -34,6 +34,7 @@ for k = 18%1:Nfiles
     allGS            = cell(1, N);
     allROC           = cell(1, N);
     flightPhases = repmat(struct( ...
+        'time', datetime.empty(0,1), ...
         'callsign',    "", ...
         'rawStates',   [], ...
         'stateNames',  string.empty, ...
@@ -46,11 +47,14 @@ for k = 18%1:Nfiles
         'groundSpeed',  [], ...
         'rateOfClimb',  [] ), N, 1); 
     
+    % % % Activate for smootherMean! % % %
+    % whereUsableResults = arrayfun(@(x) not(isempty(x.smootherMean)), cleanFlights);
+    % cleanFlights = cleanFlights(whereUsableResults);
+    
     % Loop over flights
     parfor f=1:N
-    %for f=17
-        T = cleanFlights(f).flightData;
-    
+        T = cleanFlights(f).smootherMean;
+        
         if all(isnan(T.h_QNH_Metar) ) || all(isnan(T.h_dot_baro)) || all(isnan(T.gs))
             continue
         end
@@ -60,11 +64,11 @@ for k = 18%1:Nfiles
         if sum(validSamples)<25
            continue
         end
-    
+        
         alt   = T.h_QNH_Metar(validSamples);
         roc   = T.h_dot_baro(validSamples);
         gs    = T.gs(validSamples);
-        isGnd = T.onGround(validSamples);
+ %       isGnd = T.onGround(validSamples);
         time = T.time(validSamples);
         lat_all = T.lat(validSamples);    % extract raw latitude
         lon_all = T.lon(validSamples);   % extract raw longitude
@@ -77,7 +81,7 @@ for k = 18%1:Nfiles
         alt=T.h_QNH_Metar (validSamples);
         roc   = T.h_dot_baro (validSamples);
         gs    = T.gs(validSamples);
-        isGnd = T.onGround(validSamples); 
+%        isGnd = T.onGround(validSamples); 
         time_all=T.time;
     
         descentFlags = (phaseStates == FlightPhase.Descent);
@@ -107,6 +111,7 @@ for k = 18%1:Nfiles
         lat = lat_all(keepIdx);
         lon = lon_all(keepIdx);
 
+
         allLat{f} = lat;
         allLon{f} = lon;
         allAlt{f} = alt;
@@ -117,31 +122,30 @@ for k = 18%1:Nfiles
         labels= FlightPhase.list();     
         allStates_names{f} = labels(phaseStates);
     
-        % Decidir fase global de voo
+        % Overall flight phase identification
         
         hasGoAround = any(phaseStates == FlightPhase.GoAroundClimb);  
         if hasGoAround
             allOverallPhase(f) = string(FlightOverallPhase.GoAround);
         else
-    
-            % (b) Caso não haja Go-Around, contamos quantos pontos de cada fase
-            nClimb  = sum(phaseStates == FlightPhase.Climb);
-            nDes    = sum(phaseStates == FlightPhase.Descent);
-            nLevel  = sum(phaseStates == FlightPhase.Level);
+
+            fracClimb = sum(phaseStates == FlightPhase.Climb)/numel(phaseStates);
+            fracDes = sum(phaseStates == FlightPhase.Descent)/numel(phaseStates);
+            fracLevel = sum(phaseStates == FlightPhase.Level)/numel(phaseStates);
+            fracCruise = sum(phaseStates == FlightPhase.Cruise)/numel(phaseStates);
     
             altFirst = alt(1);
             altLast = mean( alt( max(end-10,1) : end ) );
     
 
-            if (nDes > nClimb) && (altLast < 2200)
+            if ((fracDes>fracClimb) && (altLast < 2500)) || (fracDes>0.6  && (altLast < 3000))
                 allOverallPhase(f) = string(FlightOverallPhase.Landing);
     
-            elseif (nClimb > nDes) && (altLast > 5000) && (altFirst<3500)
+            elseif ((fracClimb > fracDes) && (altLast > 6000) && (altFirst<3500)) || ((altFirst< 5000) && fracClimb>0.80)
                 allOverallPhase(f) = string(FlightOverallPhase.Takeoff);
 
-            elseif  (altFirst > 5000) && (altLast > 5000)
+            elseif (altFirst > 6000) && (altLast > 6000)
                 allOverallPhase(f) = string(FlightOverallPhase.Cruise);
-   
             else
                 allOverallPhase(f) = string(FlightOverallPhase.NonDetected); 
             end
@@ -149,7 +153,8 @@ for k = 18%1:Nfiles
 
         allAirlines(f) = string(cleanFlights(f).airline);
         allAircraft(f) = string(cleanFlights(f).acType);
-
+        
+        flightPhases(f).time = time;
         flightPhases(f).callsign     = string(cleanFlights(f).callsign);
         flightPhases(f).rawStates    = allStates{f};             % numeric codes
         flightPhases(f).stateNames   = allStates_names{f};       % e.g. "Climb","Level",…
@@ -165,15 +170,13 @@ for k = 18%1:Nfiles
     end
     summaryPhases = summarizePhases(allOverallPhase);
 
-    % Store everything in your daily summary
+    % Store everything in daily summary
     dailySummaries{k} = struct( ...
         'file',             fileList(k).name, ...
         'summary',          summaryPhases, ...
         'flightPhases', flightPhases);
 end
 
-% After loop, concatenate all per‐file summaries:
-%allFilesSummary = vertcat(dailySummaries{:});
 
 disp('Program finished.')
 toc

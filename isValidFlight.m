@@ -1,4 +1,4 @@
-function tf = isValidFlight(callsign, airline, aircraftType, departures)
+function tf = isValidFlight(callsign, airline, aircraftType, smootherMean)
     % Returns TRUE if callsign and airline are valid identifiers.
     % Filters out empty, whitespace-only, literal '""', or placeholder strings.
 
@@ -7,12 +7,13 @@ function tf = isValidFlight(callsign, airline, aircraftType, departures)
     alTrim = strtrim(string(airline));
     acTrim=strtrim(string(aircraftType));
 
-   condEmpty = all(csTrim == "") && all(alTrim == "");
+
+    condEmpty = all(csTrim == "") && all(alTrim == "");
     hasCSPlace = any(startsWith(csTrim, "@@@", "IgnoreCase", true));
     hasALPlace = any(startsWith(alTrim, "@@@", "IgnoreCase", true));
     condPlace = hasCSPlace || hasALPlace;
     
-    %Consider only Long range/wide-body/medium/short range/business jet aircraft and
+    %Consider only Long range/wide-body/medium/short range/bs jet aircraft and
     %turbo-prop airliner/freighter
     %Data taken from Eurocontrol aircraft performance database
     
@@ -253,109 +254,109 @@ function tf = isValidFlight(callsign, airline, aircraftType, departures)
     'SH36'  ... % Shorts SD-360
 };
 
-    utility_single = { ...
-    'AC11', ... % Rockwell Commander 112
-    'AN2',  ... % Antonov An-2
-    'BDOG', ... % Beagle B-125 Bulldog
-    'BE23', ... % Beechcraft Model 23 Musketeer
-    'BE33', ... % Beechcraft Model 33 Debonair
-    'BE36', ... % Beechcraft A36 Bonanza
-    'C06T', ... % Cessna 206 Turbo Stationair
-    'C150', ... % Cessna 150
-    'C152', ... % Cessna 152
-    'C172', ... % Cessna 172 Skyhawk
-    'C177', ... % Cessna 177 Cardinal
-    'C182', ... % Cessna 182 Skylane
-    'C206', ... % Cessna 206 Stationair
-    'C207', ... % Cessna 207 Stationair 7
-    'C208', ... % Cessna 208 Caravan
-    'C210', ... % Cessna 210 Centurion
-    'C82R', ... % Cessna 182RG Skylane RG
-    'CP23', ... % Cap Aviation CAP-230
-    'DA40', ... % Diamond DA40 Diamond Star
-    'DA50', ... % Diamond DA50 Super Star
-    'DR40', ... % Avions Robin DR400
-    'F26T', ... % Aermacchi SF-260TP
-    'G115', ... % Grob G-115 Tutor
-    'G3',   ... % Remos G-3 Mirage
-    'M18',  ... % PZL-Mielec M-18 Dromader
-    'M20P', ... % Mooney M-20
-    'M20T', ... % Mooney M-20M Bravo
-    'P28A', ... % Piper PA-28-140 Cherokee Cruiser
-    'P28R', ... % Piper PA-28R Arrow 3
-    'P28T', ... % Piper PA-28RT-201T Turbo Arrow 4
-    'P32R', ... % Piper PA-32R Lance
-    'P46T', ... % Piper PA-46-500TP Malibu Meridian
-    'PA18', ... % Piper PA-18 Super Cub
-    'PA32', ... % Piper PA-32 Cherokee Six
-    'PA38', ... % Piper PA-38 Tomahawk
-    'PA46', ... % Piper PA-46 Malibu Mirage
-    'PC12', ... % Pilatus PC-12
-    'PC6T', ... % Pilatus PC-6 Porter
-    'PC7',  ... % Pilatus PC-7 Turbo Trainer
-    'PZ04', ... % PZL-104 Wilga
-    'RALL', ... % Socata Rallye
-    'SR20', ... % Cirrus SR20
-    'TAMP', ... % Socata TB-9 Tampico
-    'TB30', ... % Socata TB-30 Epsilon
-    'TBM7', ... % Socata TBM 700
-    'TBM8', ... % Socata TBM 850
-    'TOBA', ... % Socata TB-10 Tobago
-    'TRIN', ... % TB-20/21 Trinidad
-    'TUCA'  ... % A-27
-};
-
-
-    utility_twin = { ...
-    'AC50', ... % Aero Commander 500
-    'AC56', ... % Aero Commander 560
-    'AC68', ... % Aero Commander 680
-    'AC6L', ... % Aero Commander 690
-    'AC95', ... % 695 Jetprop Commander 1000
-    'AEST', ... % Piper Aerostar
-    'B350', ... % Beechcraft Super King Air 350
-    'BE10', ... % Beechcraft King Air 100
-    'BE20', ... % Beechcraft King Air 200
-    'BE50', ... % Beechcraft Twin Bonanza
-    'BE55', ... % Beechcraft Baron 55
-    'BE58', ... % Beechcraft Baron 58
-    'BE60', ... % Beechcraft Duke 60
-    'BE70', ... % Beechcraft Queen Air 70
-    'BE76', ... % Beechcraft Duchess 76
-    'BE80', ... % Beechcraft Queen Air 80
-    'BE95', ... % Beechcraft Travel Air 95
-    'C303', ... % Cessna T303 Crusader
-    'C310', ... % Cessna 310
-    'C337', ... % Cessna 337 Skymaster
-    'C340', ... % Cessna 340
-    'C402', ... % Cessna 402
-    'C404', ... % Cessna 404 Titan
-    'C414', ... % Cessna 414 Chancellor
-    'C421', ... % Cessna 421 Golden Eagle
-    'C425', ... % Cessna 425 Corsair / Conquest I
-    'C441', ... % Cessna 441 Conquest II
-    'D228', ... % Dornier 228
-    'D28D', ... % Dornier 228-212
-    'DA42', ... % Diamond DA42 Twin Star
-    'E110', ... % Embraer EMB 110 Bandeirante
-    'E121', ... % Embraer EMB 121 Xingu
-    'F406', ... % Reims-Cessna F406 Caravan II
-    'JS20', ... % Handley Page Jetstream 200
-    'JS3',  ... % Century Jetstream 3
-    'MU2',  ... % Mitsubishi MU-2
-    'P180', ... % Piaggio P.180 Avanti
-    'PA23', ... % Piper PA-23 Apache/Aztec
-    'PA27', ... % Piper PA-27 Aztec
-    'PA31', ... % Piper PA-31 Navajo
-    'PA34', ... % Piper PA-34 Seneca
-    'PA44', ... % Piper PA-44 Seminole
-    'PAY2', ... % Piper Cheyenne 2
-    'PAY3', ... % Piper Cheyenne 3
-    'PAY4', ... % Piper Cheyenne IV
-    'SW2',  ... % Swearingen Merlin 2
-    'SW3',  ... % Swearingen Merlin 3
-    'SW4'    ... % Fairchild Swearingen Metroliner
-};
+%     utility_single = { ...
+%     'AC11', ... % Rockwell Commander 112
+%     'AN2',  ... % Antonov An-2
+%     'BDOG', ... % Beagle B-125 Bulldog
+%     'BE23', ... % Beechcraft Model 23 Musketeer
+%     'BE33', ... % Beechcraft Model 33 Debonair
+%     'BE36', ... % Beechcraft A36 Bonanza
+%     'C06T', ... % Cessna 206 Turbo Stationair
+%     'C150', ... % Cessna 150
+%     'C152', ... % Cessna 152
+%     'C172', ... % Cessna 172 Skyhawk
+%     'C177', ... % Cessna 177 Cardinal
+%     'C182', ... % Cessna 182 Skylane
+%     'C206', ... % Cessna 206 Stationair
+%     'C207', ... % Cessna 207 Stationair 7
+%     'C208', ... % Cessna 208 Caravan
+%     'C210', ... % Cessna 210 Centurion
+%     'C82R', ... % Cessna 182RG Skylane RG
+%     'CP23', ... % Cap Aviation CAP-230
+%     'DA40', ... % Diamond DA40 Diamond Star
+%     'DA50', ... % Diamond DA50 Super Star
+%     'DR40', ... % Avions Robin DR400
+%     'F26T', ... % Aermacchi SF-260TP
+%     'G115', ... % Grob G-115 Tutor
+%     'G3',   ... % Remos G-3 Mirage
+%     'M18',  ... % PZL-Mielec M-18 Dromader
+%     'M20P', ... % Mooney M-20
+%     'M20T', ... % Mooney M-20M Bravo
+%     'P28A', ... % Piper PA-28-140 Cherokee Cruiser
+%     'P28R', ... % Piper PA-28R Arrow 3
+%     'P28T', ... % Piper PA-28RT-201T Turbo Arrow 4
+%     'P32R', ... % Piper PA-32R Lance
+%     'P46T', ... % Piper PA-46-500TP Malibu Meridian
+%     'PA18', ... % Piper PA-18 Super Cub
+%     'PA32', ... % Piper PA-32 Cherokee Six
+%     'PA38', ... % Piper PA-38 Tomahawk
+%     'PA46', ... % Piper PA-46 Malibu Mirage
+%     'PC12', ... % Pilatus PC-12
+%     'PC6T', ... % Pilatus PC-6 Porter
+%     'PC7',  ... % Pilatus PC-7 Turbo Trainer
+%     'PZ04', ... % PZL-104 Wilga
+%     'RALL', ... % Socata Rallye
+%     'SR20', ... % Cirrus SR20
+%     'TAMP', ... % Socata TB-9 Tampico
+%     'TB30', ... % Socata TB-30 Epsilon
+%     'TBM7', ... % Socata TBM 700
+%     'TBM8', ... % Socata TBM 850
+%     'TOBA', ... % Socata TB-10 Tobago
+%     'TRIN', ... % TB-20/21 Trinidad
+%     'TUCA'  ... % A-27
+% };
+% 
+% 
+%     utility_twin = { ...
+%     'AC50', ... % Aero Commander 500
+%     'AC56', ... % Aero Commander 560
+%     'AC68', ... % Aero Commander 680
+%     'AC6L', ... % Aero Commander 690
+%     'AC95', ... % 695 Jetprop Commander 1000
+%     'AEST', ... % Piper Aerostar
+%     'B350', ... % Beechcraft Super King Air 350
+%     'BE10', ... % Beechcraft King Air 100
+%     'BE20', ... % Beechcraft King Air 200
+%     'BE50', ... % Beechcraft Twin Bonanza
+%     'BE55', ... % Beechcraft Baron 55
+%     'BE58', ... % Beechcraft Baron 58
+%     'BE60', ... % Beechcraft Duke 60
+%     'BE70', ... % Beechcraft Queen Air 70
+%     'BE76', ... % Beechcraft Duchess 76
+%     'BE80', ... % Beechcraft Queen Air 80
+%     'BE95', ... % Beechcraft Travel Air 95
+%     'C303', ... % Cessna T303 Crusader
+%     'C310', ... % Cessna 310
+%     'C337', ... % Cessna 337 Skymaster
+%     'C340', ... % Cessna 340
+%     'C402', ... % Cessna 402
+%     'C404', ... % Cessna 404 Titan
+%     'C414', ... % Cessna 414 Chancellor
+%     'C421', ... % Cessna 421 Golden Eagle
+%     'C425', ... % Cessna 425 Corsair / Conquest I
+%     'C441', ... % Cessna 441 Conquest II
+%     'D228', ... % Dornier 228
+%     'D28D', ... % Dornier 228-212
+%     'DA42', ... % Diamond DA42 Twin Star
+%     'E110', ... % Embraer EMB 110 Bandeirante
+%     'E121', ... % Embraer EMB 121 Xingu
+%     'F406', ... % Reims-Cessna F406 Caravan II
+%     'JS20', ... % Handley Page Jetstream 200
+%     'JS3',  ... % Century Jetstream 3
+%     'MU2',  ... % Mitsubishi MU-2
+%     'P180', ... % Piaggio P.180 Avanti
+%     'PA23', ... % Piper PA-23 Apache/Aztec
+%     'PA27', ... % Piper PA-27 Aztec
+%     'PA31', ... % Piper PA-31 Navajo
+%     'PA34', ... % Piper PA-34 Seneca
+%     'PA44', ... % Piper PA-44 Seminole
+%     'PAY2', ... % Piper Cheyenne 2
+%     'PAY3', ... % Piper Cheyenne 3
+%     'PAY4', ... % Piper Cheyenne IV
+%     'SW2',  ... % Swearingen Merlin 2
+%     'SW3',  ... % Swearingen Merlin 3
+%     'SW4'    ... % Fairchild Swearingen Metroliner
+% };
 
     allowedTypes = [ ...
     long_range_airbus(:); ...
@@ -374,10 +375,12 @@ function tf = isValidFlight(callsign, airline, aircraftType, departures)
     med_short_range_mcDonnell_douglas_MD(:); ...
     business_jet(:); ...
     turboprop(:); ...
-    utility_single(:); ...
-    utility_twin(:); ...
+    % utility_single(:); ...
+    % utility_twin(:); ...
 ];
     condAcType = ismember(acTrim, allowedTypes);
     
     tf = ~(condEmpty || condPlace) && condAcType;
+    %add smootherMean
+    tf = tf&& ~isempty(smootherMean);
 end

@@ -10,14 +10,13 @@ function phaseStates = detectGoAround(time, alt, phaseStates, climbPhase, descen
 %   phaseStates              – with GoAroundClimb marked where allowed
 
     % hard‐coded go‐around thresholds
-    minGain       = 500;    % ft
-%    maxGain       = 4000;   % ft
+    minGain       = 500;   % ft
     altMax        = 5500;   % ft
-    altMin        = 3500;
+    altMin        = 3500;   % ft
     maxTime       = 300;    % s
 
     % your new gate parameter
-    minDescPts    = 15;     % require runs of ≥15 descent samples
+    minDescPts    = 40;     % require runs of ≥15 descent samples
 
     %% 1) find all descent‐runs of length ≥ minDescPts
     dDes        = diff([0; descentFlags; 0]);
@@ -54,38 +53,3 @@ function phaseStates = detectGoAround(time, alt, phaseStates, climbPhase, descen
         end
     end
 end
-
-
-
-
-
-% function phaseStates = detectGoAround(time, alt, phaseStates, climbPhase, descentPhase)
-% % DETECTGOAROUND Simplified go‐around detection for climb segments
-% %
-% 
-%     % hard-coded thresholds
-%     minGain = 500;    % ft
-%     maxGain = 3500;   % ft
-%     altMax  = 5000;   % ft
-%     maxTime = 300;    % s
-% 
-%     isClimb = (phaseStates == climbPhase);  
-% 
-%     % acha inícios e fins dos blocos
-%     d      = diff([0; isClimb; 0]);
-%     starts = find(d ==  1);   % ponto onde entra climb
-%     ends   = find(d == -1)-1; % ponto onde sai climb
-% 
-%     % para cada bloco, aplica critérios de go-around
-%     for k = 1:numel(starts)
-%         idx = starts(k):ends(k);
-%         t0  = time(idx(1));
-%         t1  = time(idx(end));
-%         gain = alt(idx(end)) - alt(idx(1));
-%         dur  = t1 - t0;
-%         if minGain <= gain && gain <= maxGain && max(alt(idx)) <= altMax && dur <= maxTime
-%             phaseStates(idx) = 6; %FlightPhase.GoAroundClimb - substitui 2 por 6
-%         end
-%     end
-% 
-% end

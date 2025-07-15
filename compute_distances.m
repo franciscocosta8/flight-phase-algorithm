@@ -1,9 +1,10 @@
 %% --- Keep only GOAROUNDS and LANDINGS -------------
+% Looks very huge but in olny takes about 1 sec per day of analysis
 gaALtm=[];
 gaLATm=[];
 gaLONm=[];
 eddmCenter  = [48.354017, 11.788711, 477]; % [lat,lon,alt_m]
-
+ellipsoid = wgs84Ellipsoid('meters');
 %Definition of Runway Area - Munich Airport
 rr1_lat = [48.3632; 48.3585; 48.3666; 48.3711;48.3632];   % 5 entries - closed loop
 rr1_lon = [11.7375; 11.7373; 11.8382; 11.8376; 11.7375];
@@ -118,14 +119,61 @@ for k = 1:numel(dailySummaries)
         end
     end
 
-    for i=1:Nf
+    goIdx = find( [T.overallPhase] == "GoAround" );
+    for g = 1:numel(goIdx)
+        i = goIdx(g); 
+        t_i   = T(i).time;               % sampled times for flight i
+        toCmp = T(i).flightsToCompareDist;    % flights to compare with i
+        for m = 1:numel(toCmp)               % inner loop now uses m
+            j   = toCmp(m);                  % index of comparison flight
+            t_j = T(j).time;
         
-    end 
+            % find overlap
+            [commonT, idx_i, idx_j] = intersect(t_i, t_j);
+            T(i).CompareRuns(m).flightIdx = j;
+            if isempty(commonT)
+                disp("Warning: commonT is empty");
+            else
+                T(i).CompareRuns(m).common_times      = commonT;
+                T(i).CompareRuns(m).acType_j     = T(j).aircraft;
+                T(i).CompareRuns(m).airline_j    = T(j).airline;
+                T(i).CompareRuns(m).startIdx_i = idx_i(1);
+                T(i).CompareRuns(m).endIdx_i   = idx_i(end);
+                T(i).CompareRuns(m).startIdx_j = idx_j(1);
+                T(i).CompareRuns(m).endIdx_j   = idx_j(end);
+                T(i).CompareRuns(m).latitude_i   = T(i).latitude(idx_i);
+                T(i).CompareRuns(m).longitude_i  = T(i).longitude(idx_i);
+                T(i).CompareRuns(m).altitude_i  = T(i).altitude(idx_i);
+                T(i).CompareRuns(m).latitude_j   = T(j).latitude(idx_j);
+                T(i).CompareRuns(m).longitude_j  = T(j).longitude(idx_j);
+                T(i).CompareRuns(m).altitude_j  = T(j).altitude(idx_j);
+
+                lat1 = T(i).CompareRuns(m).latitude_i;    % in degrees
+                lon1 = T(i).CompareRuns(m).longitude_i;  % in degrees
+                h1   = T(i).CompareRuns(m).altitude_i * 0.3048;  % convert ft->m
+        
+                lat2 = T(i).CompareRuns(m).latitude_j;
+                lon2 = T(i).CompareRuns(m).longitude_j;
+                h2   = T(i).CompareRuns(m).altitude_j * 0.3048;
+        
+                % Convert to ECEF (X,Y,Z in metres):
+                [x1, y1, z1] = geodetic2ecef(ellipsoid, lat1, lon1, h1);
+                [x2, y2, z2] = geodetic2ecef(ellipsoid, lat2, lon2, h2);
+        
+                % Compute 3-D Euclidean distance (in metres):
+                d3D = sqrt( (x2 - x1).^2 + (y2 - y1).^2 + (z2 - z1).^2 );
+        
+                % Store it back into your struct:
+                T(i).CompareRuns(m).distance3D_m = d3D;
+                figure;
+                plot(commonT,d3D);
+            end
+        end
+    end
     
+
     ComputeDistances_dailySummaries{k} = struct( ...
         'file',    dailySummaries{k}.file, ...
         'flightPhases', T);
-    
 
 end
-

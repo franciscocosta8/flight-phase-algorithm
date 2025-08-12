@@ -5,7 +5,6 @@
 folder    = 'jun24';
 fileList  = dir(fullfile(folder,'*.mat'));
 Nfiles    = numel(fileList);
-%results   = repmat(struct(), 1, Nfiles);  % pré-aloca um array de structs
 dailySummaries = cell(1, Nfiles);
 
 %%
@@ -68,7 +67,7 @@ for k =1:Nfiles
         alt   = T.h_QNH_Metar(validSamples);
         roc   = T.h_dot_baro(validSamples);
         gs    = T.gs(validSamples);
- %       isGnd = T.onGround(validSamples);
+ %       isGnd = T.onGround(validSamples);    not comply with smootherMean
         time = T.time(validSamples);
         lat_all = T.lat(validSamples);    % extract raw latitude
         lon_all = T.lon(validSamples);   % extract raw longitude

@@ -1,9 +1,9 @@
-%% --- Keep only GOAROUNDS and LANDINGS -------------
-% Looks very huge but in olny takes about 1 sec per day of analysis
+%% --- Keep only GOAROUNDS, LANDINGS and TAKEOFFS-------------
+% Looks very huge but it olny takes about 1 sec per day of analysis
 gaALtm=[];
 gaLATm=[];
 gaLONm=[];
-eddmCenter  = [48.354017, 11.788711, 477]; % [lat,lon,alt_m]
+eddmRef  = [48.354017, 11.788711, 477]; % [lat,lon,alt_m]
 ellipsoid = wgs84Ellipsoid('meters');
 %Definition of Runway Area - Munich Airport
 rr1_lat = [48.3632; 48.3585; 48.3666; 48.3711;48.3632];   % 5 entries - closed loop
@@ -16,7 +16,7 @@ for k = 1:numel(dailySummaries)
     k
     T = dailySummaries{k}.flightPhases;      % struct array [N×1]
 
-    excludePhases = {'Takeoff','Cruise','NonDetected'};       % phases to drop
+    excludePhases = {'Cruise','NonDetected'};       % phases to drop
 
     validIdx  = arrayfun(@(f) ...
                    ~any(strcmp(string(f.overallPhase), excludePhases)), ...
@@ -72,7 +72,7 @@ for k = 1:numel(dailySummaries)
         ref_D = NED(:,3);
         
         % 3. make a timetable
-        TT = timetable( T(i).time, ref_N, ref_E, ref_D, 'VariableNames', {'N','E','D'} );
+        % TT = timetable( T(i).time, ref_N, ref_E, ref_D, 'VariableNames', {'N','E','D'} );
     end
     
 
@@ -100,13 +100,20 @@ for k = 1:numel(dailySummaries)
     for i=1:Nf
         if  T(i).overallPhase=='GoAround'
             gaTime = T(i).goAroundTIME;
-            if ~isdatetime(gaTime) || isnat(gaTime)
-                T(i).flightsToCompareDist = [];
-                continue
-            end
+            gaTime_plus2min = gaTime + minutes(2);
+            gaTime_minus3min = gaTime - minutes(2);
+            % ********** Rever este if - porque está aqui?
+            % ****************
+            % if ~isdatetime(gaTime) || isnat(gaTime) || ~isdatetime(gaTime_minus3min) || isnat(gaTime_minus3min)
+            %     T(i).flightsToCompareDist = [];
+            %     continue
+            % end
 
             %Creates a validity mask - true when flights contain the time of go around
-            matches = cellfun(@(tv) any(tv == gaTime), timeCells);
+            % hasGA  = cellfun(@(tv) any(tv == gaTime),    timeCells);
+            % hasM3  = cellfun(@(tv) any(tv == gaTime_minus3min), timeCells);
+            %matches = hasGA & hasM3;
+            matches = cellfun(@(tv) any(tv >= gaTime_minus3min & tv <= gaTime_plus2min), timeCells);
             matches(i) = false; %takes out the value of the flight itself
             %T(i).flightsToCompareDist = find(matches);
 
@@ -135,19 +142,27 @@ for k = 1:numel(dailySummaries)
                 disp("Warning: commonT is empty");
             else
                 T(i).CompareRuns(m).common_times      = commonT;
+                T(i).CompareRuns(m).flightPhase = T(j).overallPhase;
                 T(i).CompareRuns(m).acType_j     = T(j).aircraft;
+                T(i).CompareRuns(m).WakeTurbulence_j = lookupWakeCat(T(j).aircraft);
                 T(i).CompareRuns(m).airline_j    = T(j).airline;
+
                 T(i).CompareRuns(m).startIdx_i = idx_i(1);
                 T(i).CompareRuns(m).endIdx_i   = idx_i(end);
+                T(i).CompareRuns(m).WakeTurbulence_i = lookupWakeCat(T(i).aircraft);
+
                 T(i).CompareRuns(m).startIdx_j = idx_j(1);
                 T(i).CompareRuns(m).endIdx_j   = idx_j(end);
+
                 T(i).CompareRuns(m).latitude_i   = T(i).latitude(idx_i);
                 T(i).CompareRuns(m).longitude_i  = T(i).longitude(idx_i);
                 T(i).CompareRuns(m).altitude_i  = T(i).altitude(idx_i);
+
                 T(i).CompareRuns(m).latitude_j   = T(j).latitude(idx_j);
                 T(i).CompareRuns(m).longitude_j  = T(j).longitude(idx_j);
                 T(i).CompareRuns(m).altitude_j  = T(j).altitude(idx_j);
-
+                
+                
                 lat1 = T(i).CompareRuns(m).latitude_i;    % in degrees
                 lon1 = T(i).CompareRuns(m).longitude_i;  % in degrees
                 h1   = T(i).CompareRuns(m).altitude_i * 0.3048;  % convert ft->m
@@ -160,20 +175,62 @@ for k = 1:numel(dailySummaries)
                 [x1, y1, z1] = geodetic2ecef(ellipsoid, lat1, lon1, h1);
                 [x2, y2, z2] = geodetic2ecef(ellipsoid, lat2, lon2, h2);
         
+  
                 % Compute 3-D Euclidean distance (in metres):
                 d3D = sqrt( (x2 - x1).^2 + (y2 - y1).^2 + (z2 - z1).^2 );
+                d3D_NM = d3D*0.000539956803;
         
                 % Store it back into your struct:
-                T(i).CompareRuns(m).distance3D_m = d3D;
-                figure;
-                plot(commonT,d3D);
+                T(i).CompareRuns(m).distance3D_m = d3D_NM;
+
+                % if k==3            %Take this if out ? 
+                %     % converte alturas para pés
+                %     h1_ft = h1 / 0.3048;
+                %     h2_ft = h2 / 0.3048;
+                % 
+                %     figure;
+                %     hold on;
+                %     grid on;
+                % 
+                %     % eixo esquerdo: separação em metros
+                %     yyaxis left
+                %     p1 = plot(commonT, d3D_NM, 'r--', 'LineWidth', 1.5);
+                %     ylabel('3-D separation (NM)');
+                % 
+                %     % eixo direito: alturas em pés
+                %     yyaxis right
+                %     p2 = plot(commonT, h1_ft, 'b-', 'LineWidth', 1.2);
+                %     p3 = plot(commonT, h2_ft, 'g-', 'LineWidth', 1.2);
+                %     ylabel('Altitude (ft)');
+                % 
+                %     % linha de go-around (sem aparecer na legenda)
+                %     xline(T(i).goAroundTIME, '--k', ' Go-Around start', ...
+                %           'LineWidth', 1.5, ...
+                %           'LabelHorizontalAlignment','left', ...
+                %           'LabelVerticalAlignment','bottom', ...
+                %           'HandleVisibility','off');
+                % 
+                %     % constrói as strings de legenda das alturas
+                %     leg_h1 = sprintf('%s altitude (ft)', T(i).aircraft);
+                %     leg_h2 = sprintf('%s altitude (ft)', T(i).CompareRuns(m).acType_j);
+                % 
+                %     % legenda só com as 3 curvas
+                %     legend([p1 p2 p3], ...
+                %            {'Separation (NM)', leg_h1, leg_h2}, ...
+                %            'Location','bestoutside');
+                % 
+                %     xlabel('Time');
+                %     title('Separation during Go-Around phases');
+                %     datetick('x','HH:MM','keeplimits');
+                %     hold off;          
+                % 
+                % end
             end
         end
     end
-    
 
     ComputeDistances_dailySummaries{k} = struct( ...
         'file',    dailySummaries{k}.file, ...
         'flightPhases', T);
 
-end
+end 

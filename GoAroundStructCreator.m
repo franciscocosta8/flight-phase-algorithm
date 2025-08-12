@@ -1,0 +1,255 @@
+%% Gathers GoAround data from dailySummaries
+idxN = [];
+idxI = [];
+allF = {};
+
+for n = 1:numel(ComputeDistances_dailySummaries)
+    FP  = ComputeDistances_dailySummaries{1,n}.flightPhases;
+    ops = lower(string({FP.overallPhase}));
+    inRW = (([FP.everInRunway1] | [FP.everInRunway2]) == 1);
+    mask = contains(ops,"goaround") & inRW;
+    ii = find(mask);
+    for t = 1:numel(ii)
+        alt = ComputeDistances_dailySummaries{1,n}.flightPhases(ii(t)).altitude;
+        if ~isempty(alt) && ~any(alt < 1400)
+            idxN(end+1,1) = n;
+            idxI(end+1,1) = ii(t);
+            allF = union(allF, fieldnames(FP(ii(t)))', 'stable');
+        end
+    end
+end
+
+if isempty(idxN)
+    GoAroundsData = struct([]);
+else
+    tmpl = cell2struct(repmat({[]},1,numel(allF)), allF, 2);
+    GoAroundsData = repmat(tmpl, numel(idxN), 1);
+    for r = 1:numel(idxN)
+        n = idxN(r); i = idxI(r);
+        f = fieldnames(ComputeDistances_dailySummaries{1,n}.flightPhases(i))';
+        for j = 1:numel(f)
+            GoAroundsData(r).(f{j}) = ComputeDistances_dailySummaries{1,n}.flightPhases(i).(f{j});
+        end
+    end
+end
+
+%% Plots some Go-Arounds plus Distance between them
+for m = 1:numel(GoAroundsData(i).CompareRuns)
+    CR = GoAroundsData(i).CompareRuns(m);
+    t  = CR.common_times;
+    ai = CR.altitude_i;
+    aj = CR.altitude_j;
+    dist_nm = CR.distance3D_m;
+
+    acType_i = GoAroundsData(i).aircraft;
+    acType_j = CR.acType_j;
+
+    s_i = upper(string(CR.WakeTurbulence_i));
+    if s_i == "SUPER_HEAVY"
+        wt_i = 'Super Heavy';
+    elseif s_i == "UPPER_HEAVY"
+        wt_i = 'Upper Heavy';
+    elseif s_i == "LOWER_HEAVY"
+        wt_i = 'Lower Heavy';
+    elseif s_i == "UPPER_MEDIUM"
+        wt_i = 'Upper Medium';
+    elseif s_i == "LOWER_MEDIUM"
+        wt_i = 'Lower Medium';
+    elseif s_i == "LIGHT"
+        wt_i = 'Light';
+    else
+        wt_i = char(strrep(string(CR.WakeTurbulence_i),'_',' '));
+    end
+
+    s_j = upper(string(CR.WakeTurbulence_j));
+    if s_j == "SUPER_HEAVY"
+        wt_j = 'Super Heavy';
+    elseif s_j == "UPPER_HEAVY"
+        wt_j = 'Upper Heavy';
+    elseif s_j == "LOWER_HEAVY"
+        wt_j = 'Lower Heavy';
+    elseif s_j == "UPPER_MEDIUM"
+        wt_j = 'Upper Medium';
+    elseif s_j == "LOWER_MEDIUM"
+        wt_j = 'Lower Medium';
+    elseif s_j == "LIGHT"
+        wt_j = 'Light';
+    else
+        wt_j = char(strrep(string(CR.WakeTurbulence_j),'_',' '));
+    end
+
+    fig = figure('Units','pixels','Position',[100 100 1600 800]);
+    ax  = axes('Parent',fig); hold(ax,'on'); grid(ax,'on'); box(ax,'on');
+
+    yyaxis(ax,'left');
+    plot(ax, t, ai, 'LineWidth', 1.5);
+    plot(ax, t, aj, 'LineWidth', 1.5);
+    ylabel(ax,'Altitude (ft)','FontSize',16);
+
+    yyaxis(ax,'right');
+    plot(ax, t, dist_nm, 'LineWidth', 1.5);
+    ylabel(ax,'3D separation (NM)','FontSize',16);
+
+    xlabel(ax,'Time','FontSize',16);
+    set(ax,'FontSize',16);
+    if isdatetime(t), ax.XAxis.TickLabelFormat = 'HH:mm:ss'; end
+
+    title(ax,'Altitude and 3D Separation','FontSize',20);
+    legend(ax, {sprintf('GA aircraft altitude (%s, WT:%s)', char(string(acType_i)), wt_i), ...
+                sprintf('Other aircraft altitude (%s, WT:%s)', char(string(acType_j)), wt_j), ...
+                '3D separation (NM)'}, 'Location','best');
+end
+
+
+
+%% ---  Compute pre-GA mean altitudes for Landing comparisons  --- Tries to know which aircraft is beyond the other
+% for i = 1:numel(GoAroundsData)
+%     if ~isfield(GoAroundsData(i),'CompareRuns') || isempty(GoAroundsData(i).CompareRuns)
+%         continue
+%     end
+%     if ~isfield(GoAroundsData(i),'goAroundIdx') || isempty(GoAroundsData(i).goAroundIdx) || ~isscalar(GoAroundsData(i).goAroundIdx) || ~isfinite(GoAroundsData(i).goAroundIdx)
+%         continue
+%     end
+%     ga = GoAroundsData(i).goAroundIdx;
+% 
+%     for m = 1:numel(GoAroundsData(i).CompareRuns)
+%         CR = GoAroundsData(i).CompareRuns(m);
+% 
+%         if ~isfield(CR,'flightPhase') || isempty(CR.flightPhase)
+%             continue
+%         end
+%         isLanding = any(strcmpi(string(CR.flightPhase), "Landing"));
+%         if ~isLanding
+%             continue
+%         end
+%         if ~all(isfield(CR, {'altitude_i','altitude_j','startIdx_i','endIdx_i','startIdx_j','endIdx_j'}))
+%             continue
+%         end
+% 
+%         si = CR.startIdx_i;  ei = CR.endIdx_i;
+%         sj = CR.startIdx_j;  ej = CR.endIdx_j;
+%         if isempty(si) || isempty(sj) || any(~isfinite([si ei sj ej])) || si>ei || sj>ej
+%             continue
+%         end
+% 
+%         i_end = min(max(ga, si), ei);
+%         if i_end < si
+%             continue
+%         end
+%         rel   = i_end - si + 1;
+%         j_end = min(sj + rel - 1, ej);
+% 
+%         ai = CR.altitude_i;
+%         aj = CR.altitude_j;
+%         if isempty(ai) || isempty(aj)
+%             continue
+%         end
+% 
+%         i_end = min(i_end, numel(ai));
+%         j_end = min(j_end, numel(aj));
+%         if i_end < si || j_end < sj
+%             continue
+%         end
+% 
+%         iRange = si:i_end;
+%         jRange = sj:j_end;
+% 
+%         mean_iBeforeGA = mean(ai(iRange), 'omitnan');
+%         mean_jBeforeGA = mean(aj(jRange), 'omitnan');
+% 
+%         GoAroundsData(i).CompareRuns(m).meanAltitude_i_uptoGA = mean_iBeforeGA;
+%         GoAroundsData(i).CompareRuns(m).meanAltitude_j_uptoGA = mean_jBeforeGA;
+%     end
+% end
+
+
+
+%% Plots Local of Go-Around start
+M   = numel(GoAroundsData);
+lat = nan(M,1); lon = nan(M,1); cs = strings(M,1);
+
+for r = 1:M
+    g = GoAroundsData(r);
+    k = [];
+    if isfield(g,'goAroundLat') && isfield(g,'goAroundLon') && ~isempty(g.goAroundLat) && ~isempty(g.goAroundLon)
+        lat(r) = g.goAroundLat; lon(r) = g.goAroundLon;
+    elseif isfield(g,'goAroundTIME') && isfield(g,'time') && isfield(g,'latitude') && isfield(g,'longitude')
+        dt = g.goAroundTIME; tv = g.time;
+        if ~isempty(tv)
+            k = find(tv==dt,1); if isempty(k), [~,k] = min(abs(tv - dt)); end
+            lat(r) = g.latitude(k); lon(r) = g.longitude(k);
+        end
+    end
+    if isfield(g,'callsign') && ~isempty(g.callsign)
+        if isstring(g.callsign) || ischar(g.callsign)
+            cs(r) = string(g.callsign);
+        elseif iscell(g.callsign)
+            if ~isempty(k) && k<=numel(g.callsign), cs(r) = string(g.callsign{k});
+            else, cs(r) = string(g.callsign{1});
+            end
+        else
+            cs(r) = string(g.callsign);
+        end
+    else
+        cs(r) = "N/A";
+    end
+end
+
+mask = isfinite(lat) & isfinite(lon);
+lat = lat(mask); lon = lon(mask); cs = cs(mask);
+
+fig = figure('Units','pixels','Position',[100 100 1200 600]);
+gx  = geoaxes('Parent',fig); hold(gx,'on'); geobasemap(gx,'topographic');
+s = geoscatter(gx, lat, lon, 36, 'filled', 'MarkerFaceColor','r', 'MarkerEdgeColor','k');
+gx.FontSize = 16;
+
+if exist('eddmCenter','var') && numel(eddmCenter)>=2
+    geoscatter(gx, eddmCenter(1), eddmCenter(2), 80, 'p', 'filled', 'MarkerEdgeColor','k');
+    legend(gx, {'Go-around start','Airport'}, 'Location','best');
+else
+    legend(gx, {'Go-around start'}, 'Location','best');
+end
+
+latrng = [min(lat) max(lat)]; lonrng = [min(lon) max(lon)];
+dlat = max(0.01, 0.05*diff(latrng)); dlon = max(0.02, 0.05*diff(lonrng));
+geolimits(gx, [latrng(1)-dlat, latrng(2)+dlat], [lonrng(1)-dlon, lonrng(2)+dlon]);
+
+title(gx, sprintf('Go-Around Start Locations June 2024', numel(lat)), 'FontSize', 20)
+
+row = dataTipTextRow('Callsign', cs);
+s.DataTipTemplate.DataTipRows(end+1) = row;
+%%
+set(gcf,'Units','pixels','Position',[100 100 1200 600])
+exportgraphics(gcf,'C:\Users\franc\Desktop\gráficos - tese\goaround_location.png','Resolution',300,'BackgroundColor','white')
+
+
+%% Statistic of altitudes of go around start
+alt = [GoAroundsData.goAroundAlt].';
+alt = alt(isfinite(alt));
+
+fig = figure('Units','pixels','Position',[100 100 600 600]);
+ax  = axes('Parent',fig); hold(ax,'on'); grid(ax,'on'); box(ax,'on');
+
+histogram(ax, alt, 'BinMethod','fd');
+xlabel(ax,'Go-around start altitude [ft]','FontSize',16);
+ylabel(ax,'Count','FontSize',16);
+title(ax,sprintf('Go-around start altitudes - June 2024', numel(alt)),'FontSize',20);
+
+set(gcf,'Units','pixels','Position',[100 100 1200 600])
+exportgraphics(gcf,'C:\Users\franc\Desktop\gráficos - tese\goaround_startaltitudes2.png','Resolution',300,'BackgroundColor','white')
+
+%%
+alt = [GoAroundsData.goAroundAlt].';
+alt = alt(isfinite(alt));
+
+fig2 = figure('Units','pixels','Position',[100 100 600 600]);
+ax  = axes('Parent',fig2); hold(ax,'on'); grid(ax,'on'); box(ax,'on');
+
+boxchart(ones(numel(alt),1), alt);
+xlim(ax,[0.5 1.5]); xticks(ax,1); xticklabels(ax,["Altitudes"]);
+ylabel(ax,'Go-around start altitude [ft]','FontSize',16);
+title(ax,sprintf('Distribution Go-Around start Altitudes - June 2024', numel(alt)),'FontSize',19);
+
+set(gcf,'Units','pixels','Position',[100 100 1200 600])
+exportgraphics(gcf,'C:\Users\franc\Desktop\gráficos - tese\goaround_startaltitudes.png','Resolution',300,'BackgroundColor','white')
+

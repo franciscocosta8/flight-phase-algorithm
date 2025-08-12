@@ -1,0 +1,170 @@
+%% Gathers GoAround data from dailySummaries
+idxN = [];
+idxI = [];
+allF = {};
+
+for n = 1:numel(ComputeDistances_dailySummaries)
+    FP  = ComputeDistances_dailySummaries{1,n}.flightPhases;
+    ops = lower(string({FP.overallPhase}));
+    inRW = (([FP.everInRunway1] | [FP.everInRunway2]) == 1);
+    mask = contains(ops,"goaround") & inRW;
+    ii = find(mask);
+    for t = 1:numel(ii)
+        alt = ComputeDistances_dailySummaries{1,n}.flightPhases(ii(t)).altitude;
+        if ~isempty(alt) && ~any(alt < 1400)
+            idxN(end+1,1) = n;
+            idxI(end+1,1) = ii(t);
+            allF = union(allF, fieldnames(FP(ii(t)))', 'stable');
+        end
+    end
+end
+
+if isempty(idxN)
+    GoAroundsData = struct([]);
+else
+    tmpl = cell2struct(repmat({[]},1,numel(allF)), allF, 2);
+    GoAroundsData = repmat(tmpl, numel(idxN), 1);
+    for r = 1:numel(idxN)
+        n = idxN(r); i = idxI(r);
+        f = fieldnames(ComputeDistances_dailySummaries{1,n}.flightPhases(i))';
+        for j = 1:numel(f)
+            GoAroundsData(r).(f{j}) = ComputeDistances_dailySummaries{1,n}.flightPhases(i).(f{j});
+        end
+    end
+end
+
+%% ---  Compute pre-GA mean altitudes for Landing comparisons  ---
+for i = 1:numel(GoAroundsData)
+    ga = GoAroundsData(i).goAroundIdx;
+
+    for m = 1:numel(GoAroundsData(i).CompareRuns)
+        CR = GoAroundsData(i).CompareRuns(m);
+        
+        if ~(isfield(CR,'flightPhase') && strcmpi(string(CR.flightPhase),'Landing'))
+            continue
+        end
+        si = CR.startIdx_i;  ei = CR.endIdx_i;
+        sj = CR.startIdx_j;  ej = CR.endIdx_j;
+
+        if isempty(si) || isempty(sj) || any(~isfinite([si ei sj ej])) || si>ei || sj>ej
+            continue
+        end
+
+        % Clip i’s endpoint to the overlap and to the GA index; mirror length on j
+        i_end = min(max(ga,si), ei);
+        if i_end < si
+            continue
+        end
+        rel   = i_end - si + 1;                  % number of samples from si up to GA within overlap
+        j_end = min(sj + rel - 1, ej);
+
+        ai = CR.altitude_i;
+        aj = CR.altitude_j;
+
+        if isempty(ai) || isempty(aj)
+            continue
+        end
+        i_end = min(i_end, numel(ai));
+        j_end = min(j_end, numel(aj));
+
+        iRange = si:i_end;
+        jRange = sj:j_end;
+
+        mean_iBeforeGA=mean(ai(iRange));
+        mean_jBeforeGA=mean(ai(jRange));
+
+        GoAroundsData(i).CompareRuns(m).meanAltitude_i_uptoGA = mean(ai(iRange), 'omitnan');
+        GoAroundsData(i).CompareRuns(m).meanAltitude_j_uptoGA = mean(aj(jRange), 'omitnan');
+    end
+end
+
+
+%% Plots Local of Go-Around start
+M   = numel(GoAroundsData);
+lat = nan(M,1); lon = nan(M,1); cs = strings(M,1);
+
+for r = 1:M
+    g = GoAroundsData(r);
+    k = [];
+    if isfield(g,'goAroundLat') && isfield(g,'goAroundLon') && ~isempty(g.goAroundLat) && ~isempty(g.goAroundLon)
+        lat(r) = g.goAroundLat; lon(r) = g.goAroundLon;
+    elseif isfield(g,'goAroundTIME') && isfield(g,'time') && isfield(g,'latitude') && isfield(g,'longitude')
+        dt = g.goAroundTIME; tv = g.time;
+        if ~isempty(tv)
+            k = find(tv==dt,1); if isempty(k), [~,k] = min(abs(tv - dt)); end
+            lat(r) = g.latitude(k); lon(r) = g.longitude(k);
+        end
+    end
+    if isfield(g,'callsign') && ~isempty(g.callsign)
+        if isstring(g.callsign) || ischar(g.callsign)
+            cs(r) = string(g.callsign);
+        elseif iscell(g.callsign)
+            if ~isempty(k) && k<=numel(g.callsign), cs(r) = string(g.callsign{k});
+            else, cs(r) = string(g.callsign{1});
+            end
+        else
+            cs(r) = string(g.callsign);
+        end
+    else
+        cs(r) = "N/A";
+    end
+end
+
+mask = isfinite(lat) & isfinite(lon);
+lat = lat(mask); lon = lon(mask); cs = cs(mask);
+
+fig = figure('Units','pixels','Position',[100 100 1200 600]);
+gx  = geoaxes('Parent',fig); hold(gx,'on'); geobasemap(gx,'topographic');
+s = geoscatter(gx, lat, lon, 36, 'filled', 'MarkerFaceColor','r', 'MarkerEdgeColor','k');
+gx.FontSize = 16;
+
+if exist('eddmCenter','var') && numel(eddmCenter)>=2
+    geoscatter(gx, eddmCenter(1), eddmCenter(2), 80, 'p', 'filled', 'MarkerEdgeColor','k');
+    legend(gx, {'Go-around start','Airport'}, 'Location','best');
+else
+    legend(gx, {'Go-around start'}, 'Location','best');
+end
+
+latrng = [min(lat) max(lat)]; lonrng = [min(lon) max(lon)];
+dlat = max(0.01, 0.05*diff(latrng)); dlon = max(0.02, 0.05*diff(lonrng));
+geolimits(gx, [latrng(1)-dlat, latrng(2)+dlat], [lonrng(1)-dlon, lonrng(2)+dlon]);
+
+title(gx, sprintf('Go-Around Start Locations June 2024', numel(lat)), 'FontSize', 20)
+
+row = dataTipTextRow('Callsign', cs);
+s.DataTipTemplate.DataTipRows(end+1) = row;
+%%
+set(gcf,'Units','pixels','Position',[100 100 1200 600])
+exportgraphics(gcf,'C:\Users\franc\Desktop\gráficos - tese\goaround_location.png','Resolution',300,'BackgroundColor','white')
+
+
+%% Statistic of altitudes of go around start
+alt = [GoAroundsData.goAroundAlt].';
+alt = alt(isfinite(alt));
+
+fig = figure('Units','pixels','Position',[100 100 600 600]);
+ax  = axes('Parent',fig); hold(ax,'on'); grid(ax,'on'); box(ax,'on');
+
+histogram(ax, alt, 'BinMethod','fd');
+xlabel(ax,'Go-around start altitude [ft]','FontSize',16);
+ylabel(ax,'Count','FontSize',16);
+title(ax,sprintf('Go-around start altitudes - June 2024', numel(alt)),'FontSize',20);
+
+set(gcf,'Units','pixels','Position',[100 100 1200 600])
+exportgraphics(gcf,'C:\Users\franc\Desktop\gráficos - tese\goaround_startaltitudes2.png','Resolution',300,'BackgroundColor','white')
+
+%%
+alt = [GoAroundsData.goAroundAlt].';
+alt = alt(isfinite(alt));
+
+fig2 = figure('Units','pixels','Position',[100 100 600 600]);
+ax  = axes('Parent',fig2); hold(ax,'on'); grid(ax,'on'); box(ax,'on');
+
+boxchart(ones(numel(alt),1), alt);
+xlim(ax,[0.5 1.5]); xticks(ax,1); xticklabels(ax,["Altitudes"]);
+ylabel(ax,'Go-around start altitude [ft]','FontSize',16);
+title(ax,sprintf('Distribution Go-Around start Altitudes - June 2024', numel(alt)),'FontSize',19);
+
+set(gcf,'Units','pixels','Position',[100 100 1200 600])
+exportgraphics(gcf,'C:\Users\franc\Desktop\gráficos - tese\goaround_startaltitudes.png','Resolution',300,'BackgroundColor','white')
+

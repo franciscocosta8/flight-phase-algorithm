@@ -1,6 +1,8 @@
 %% Plot every flight that landed or took-off from Munich Airport
 %% Just change the values from D
-D = dailySummaries{1,3}.flightPhases(272);
+D = dailySummaries{1,1}.flightPhases(9);
+
+% Altitude vs time plot
 
 outputDir     = 'C:\Users\franc\Desktop\gráficos - tese';
 
@@ -42,7 +44,7 @@ axis(ax,'tight');
 dx = diff(ax.XLim); ax.XLim = ax.XLim + [-1 1]*dx*0.05;
 dy = diff(ax.YLim); ax.YLim = ax.YLim + [0 1]*dy*0.05;
 %%
-pngFile = fullfile(outputDir, 'PlotExample.png');
+pngFile = fullfile(outputDir, 'takeoffExample2.png');
 exportgraphics(gcf, pngFile, 'Resolution', 300);
 
 

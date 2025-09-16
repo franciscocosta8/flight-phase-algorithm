@@ -1,8 +1,28 @@
 %% Flight Phase Identification Pipeline
-% Load results and filter invalid flights
-%load('results.mat');
+% Takes a litlle bit of time to run each month - around 4~5 min
+%
+% The code is structured in a way to compute information about flights in a
+% monthly coordenated analysis. The complete data is divided in 3 main
+% variables - each one computed and obtained in 3 different files that must
+% be run by order. First is flight_phase_identification.m, then
+% compute_distances.m and finally GoAroundStructCreator.m
+%
+% In order to start running this file you just have to define the folder in
+% which the results are stored and then 
+%
+%
+%
+% Most important variable obtained in this file is 'dailySummaries', which has the  
+% flight phase of the aircraft in all of its trajectory (instantaneous flight phase) 
+% and the overall flight phase of the aircraft (Landing, Take
+% off,Go-Around)
+%
+%
+% After running this file you can run compute_distances.m to obtain more
+% detail on go-arounds made in that month with the variable 'ComputeDistances_dailySummaries'
+% 
 %% 
-folder    = 'jun24';
+folder    = 'may24';
 fileList  = dir(fullfile(folder,'*.mat'));
 Nfiles    = numel(fileList);
 dailySummaries = cell(1, Nfiles);
@@ -12,7 +32,7 @@ tic
 cfg=config();
 labels = FlightPhase.list();
 
-for k =1:Nfiles
+for k =1:Nfiles % k corresponds to day of month
     
     k
     fn = fullfile(folder, fileList(k).name);
@@ -46,14 +66,9 @@ for k =1:Nfiles
         'groundSpeed',  [], ...
         'rateOfClimb',  [] ), N, 1); 
     
-    % % % Activate for smootherMean! % % %
-    % whereUsableResults = arrayfun(@(x) not(isempty(x.smootherMean)), cleanFlights);
-    % cleanFlights = cleanFlights(whereUsableResults);
-    
-    % Loop over flights
+    % loop over flights
     parfor f=1:N
         T = cleanFlights(f).smootherMean;
-        
         if all(isnan(T.h_QNH_Metar) ) || all(isnan(T.h_dot_baro)) || all(isnan(T.gs))
             continue
         end
@@ -64,10 +79,9 @@ for k =1:Nfiles
            continue
         end
         
-        alt   = T.h_QNH_Metar(validSamples);
+        alt   = T.h_QNH_Metar(validSamples) ;
         roc   = T.h_dot_baro(validSamples);
         gs    = T.gs(validSamples);
- %       isGnd = T.onGround(validSamples);    not comply with smootherMean
         time = T.time(validSamples);
         lat_all = T.lat(validSamples);    % extract raw latitude
         lon_all = T.lon(validSamples);   % extract raw longitude
@@ -80,10 +94,10 @@ for k =1:Nfiles
         alt=T.h_QNH_Metar (validSamples);
         roc   = T.h_dot_baro (validSamples);
         gs    = T.gs(validSamples);
-%        isGnd = T.onGround(validSamples); 
         time_all=T.time;
     
         descentFlags = (phaseStates == FlightPhase.Descent);
+
         % Identify Go Around
         if any(phaseStates == FlightPhase.Climb) && any(phaseStates == FlightPhase.Descent)
             [phaseStates] = detectGoAround(time_all, alt, phaseStates, FlightPhase.Climb, descentFlags);
@@ -97,11 +111,10 @@ for k =1:Nfiles
     
          % remove points classified with climb or descent that are not
          % changing altitude
-        [keepIdx,phaseStates] = filterFlatClimbDescent(alt, phaseStates);
+        [keepIdx,phaseStates] = filterFlatClimbDescent(alt, phaseStates); %was applied to flightData
         t_removed=time(~keepIdx);
         alt_removed=alt(~keepIdx);
     
-        % Agora refazemos todos os vetores “time, roc, alt, gs, phaseStates”
         time = time(keepIdx);
         roc  = roc(keepIdx);
         alt  = alt(keepIdx);
@@ -124,7 +137,7 @@ for k =1:Nfiles
         % Overall flight phase identification
         
         hasGoAround = any(phaseStates == FlightPhase.GoAroundClimb);  
-        if hasGoAround
+        if hasGoAround && all(alt>1400)
             allOverallPhase(f) = string(FlightOverallPhase.GoAround);
         else
 

@@ -1,12 +1,5 @@
 %% --- Keep only GOAROUNDS, LANDINGS and TAKEOFFS-------------
 % Takes around 30s for a month
-%
-% IMPORTANT -> Activate the next two lines for May -> there was a problem
-% with one flight in one day
-%
-%[~,index] = sortrows([dailySummaries{1, 19}.flightPhases.overallPhase].'); dailySummaries{1, 19}.flightPhases = dailySummaries{1, 19}.flightPhases(index); clear index
-%dailySummaries{1, 19}.flightPhases(1) = [];
-%
 gaALtm=[];
 gaLATm=[];
 gaLONm=[];
@@ -21,6 +14,9 @@ rr2_lon = [11.7339; 11.7341; 11.8218; 11.8214; 11.7339];
 
 for k =1:numel(dailySummaries)
     k
+    % if k==19 %Use for month -> may
+    %     continue 
+    % end
     T = dailySummaries{k}.flightPhases;      % struct array [N×1]
 
     excludePhases = {'Cruise','NonDetected'};       % phases to drop
@@ -39,8 +35,6 @@ for k =1:numel(dailySummaries)
         dt = datetime( sectorStructs(i).time, 'Format', 'd-MMM-y HH:mm:ss.SSS' );
         isOnSecond = mod( second(dt), 1 ) == 0;
     
-
-
         % apply that mask to every field of T(i)
         T(i).time        = sectorStructs(i).time(isOnSecond);
         T(i).altitude    = sectorStructs(i).altitude(isOnSecond);
@@ -75,7 +69,13 @@ for k =1:numel(dailySummaries)
     
         %Compute distances algorithm
         T(i).altitude_meter = T(i).altitude * 0.3048;
- 
+        % NED = lla2ned([T(i).latitude, T(i).longitude, T(i).altitude_meter], eddmRef, 'flat');
+        % ref_N = NED(:,1);
+        % ref_E = NED(:,2);
+        % ref_D = NED(:,3);
+        
+        % 3. make a timetable
+        % TT = timetable( T(i).time, ref_N, ref_E, ref_D, 'VariableNames', {'N','E','D'} );
     end
     
 
@@ -88,11 +88,11 @@ for k =1:numel(dailySummaries)
         lat = T(i).latitude;    % N×1 vector
         lon = T(i).longitude;   % N×1 vector
     
-        %  in‐polygon tests (vectorized over all fixes)
+        % 1) in‐polygon tests (vectorized over all fixes)
         inR1 = inpolygon(lon, lat, rr1_lon, rr1_lat);
         inR2 = inpolygon(lon, lat, rr2_lon, rr2_lat);
     
-        % did the flight ever enter each polygon?
+        % 2) did the flight ever enter each polygon?
         T(i).everInRunway1 = any(inR1);
         T(i).everInRunway2 = any(inR2);  
     end
@@ -105,10 +105,20 @@ for k =1:numel(dailySummaries)
             gaTime = T(i).goAroundTIME;
             gaTime_plus2min = gaTime + minutes(2);
             gaTime_minus3min = gaTime - minutes(2);
-            % obtain the flights 2 minutes before and after the go-around
+            % ********** Rever este if - porque está aqui?
+            % ****************
+            % if ~isdatetime(gaTime) || isnat(gaTime) || ~isdatetime(gaTime_minus3min) || isnat(gaTime_minus3min)
+            %     T(i).flightsToCompareDist = [];
+            %     continue
+            % end
+
+            %Creates a validity mask - true when flights contain the time of go around
+            % hasGA  = cellfun(@(tv) any(tv == gaTime),    timeCells);
+            % hasM3  = cellfun(@(tv) any(tv == gaTime_minus3min), timeCells);
+            %matches = hasGA & hasM3;
             matches = cellfun(@(tv) any(tv >= gaTime_minus3min & tv <= gaTime_plus2min), timeCells);
-            matches(i) = false;
-            
+            matches(i) = false; %takes out the value of the flight itself
+            %T(i).flightsToCompareDist = find(matches);
 
             if T(i).goAroundLat<45.352
                  matches = matches & runway2Flags;
@@ -156,15 +166,15 @@ for k =1:numel(dailySummaries)
                 T(i).CompareRuns(m).altitude_j  = T(j).altitude(idx_j);
                 
                 
-                lat1 = T(i).CompareRuns(m).latitude_i;    % degrees
-                lon1 = T(i).CompareRuns(m).longitude_i;  % degrees
+                lat1 = T(i).CompareRuns(m).latitude_i;    % in degrees
+                lon1 = T(i).CompareRuns(m).longitude_i;  % in degrees
                 h1   = T(i).CompareRuns(m).altitude_i * 0.3048;  % convert ft->m
         
                 lat2 = T(i).CompareRuns(m).latitude_j;
                 lon2 = T(i).CompareRuns(m).longitude_j;
                 h2   = T(i).CompareRuns(m).altitude_j * 0.3048;
         
-                % Convert to ECEF (metres):
+                % Convert to ECEF (X,Y,Z in metres):
                 [x1, y1, z1] = geodetic2ecef(ellipsoid, lat1, lon1, h1);
                 [x2, y2, z2] = geodetic2ecef(ellipsoid, lat2, lon2, h2);
         
